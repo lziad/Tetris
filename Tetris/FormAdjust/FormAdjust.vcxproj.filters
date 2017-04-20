@@ -18,22 +18,5 @@
     <ClCompile Include="Source.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="LocalTestPackage.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="jsoncpp.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="jsoncpp\json-forwards.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="LocalTestPackage.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="jsoncpp\json.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
   </ItemGroup>
 </Project>
