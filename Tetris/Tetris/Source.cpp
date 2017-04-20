@@ -1,10 +1,13 @@
 /**
-* Tetris 简单交互样例程序
+* Tetris JSON交互样例程序
 * https://wiki.botzone.org/index.php?title=Tetris
 */
-// 注意：x的范围是1~MAPWIDTH，y的范围是1~MAPHEIGHT
-// 数组是先行（y）后列（c）
-// 坐标系：原点在左下角
+
+/**
+*  注意：x的范围是1~MAPWIDTH，y的范围是1~MAPHEIGHT
+*  数组是先行（y）后列（c）
+*  坐标系：原点在左下角
+*/
 
 #include <iostream>
 #include <string>
@@ -12,18 +15,20 @@
 #include <algorithm>
 #include <cstdlib>
 #include <ctime>
+#include "jsoncpp/json.h"
 using namespace std;
 
 #define MAPWIDTH 10
 #define MAPHEIGHT 20
 
 
+
 // 我所在队伍的颜色（0为红，1为蓝，仅表示队伍，不分先后）
-int currBotColor;
+int myColor;
 int enemyColor;
 
-// 先y后x，记录地图状态，0为空，1为以前放置，2为刚刚放置，负数为越界
-// （2用于在清行后将最后一步撤销再送给对方）
+/* 先y后x，记录地图状态，0为空，1为以前放置，2为刚刚放置，负数为越界	  */
+/* （2用于在清行后将最后一步撤销再送给对方）						  */
 int gridInfo[2][MAPHEIGHT + 2][MAPWIDTH + 2] = { 0 };
 
 // 代表分别向对方转移的行
@@ -331,53 +336,73 @@ int main()
 
 	int turnID, blockType;
 	int nextTypeForColor[2];
-	cin >> turnID;
 
-	// 先读入第一回合，得到自己的颜色
-	// 双方的第一块肯定是一样的
-	cin >> blockType >> currBotColor;
-	enemyColor = 1 - currBotColor;
+	// 读入JSON
+	string str;
+	getline(cin, str);
+	Json::Reader reader;
+	Json::Value input;
+	reader.parse(str, input);
+
+	/* 先读入第一回合，得到自己的颜色	*/  
+	/* 双方的第一块肯定是一样的		*/
+	turnID = input["responses"].size() + 1;
+	auto &first = input["requests"][(Json::UInt) 0];
+
+	blockType = first["block"].asInt();
+	myColor = first["color"].asInt();
+
+	enemyColor = 1 - myColor;
 	nextTypeForColor[0] = blockType;
 	nextTypeForColor[1] = blockType;
 	typeCountForColor[0][blockType]++;
 	typeCountForColor[1][blockType]++;
 
-	// 然后分析以前每回合的输入输出，并恢复状态
-	// 循环中，color 表示当前这一行是 color 的行为
-	// 平台保证所有输入都是合法输入
+
+	/* 然后分析以前每回合的输入输出，并恢复状态			*/
+	/* 循环中，color 表示当前这一行是 color 的行为		*/
+	/* 平台保证所有输入都是合法输入					*/
 	for (int i = 1; i < turnID; i++)
 	{
 		int currTypeForColor[2] = { nextTypeForColor[0], nextTypeForColor[1] };
-		int n, x, y, o;
-		// 根据这些输入输出逐渐恢复状态到当前回合
-
-		// 先读自己的输出，也就是自己的行为
-		// 自己的输出是一个序列，但是只有最后一步有用
-		// 所以只保留最后一步
-		// 然后模拟最后一步放置块
-		cin >> blockType >> n;
-		for (int j = 0; j < n; j++)
-			cin >> x >> y >> o;
+		int x, y, o;
+		/* 根据这些输入输出逐渐恢复状态到当前回合					*/
+		 														
+		/* 先读自己的输出，也就是自己的行为						*/ 
+		/* 自己的输出是一个序列，但是只有最后一步有用		 		*/
+		/* 所以只保留最后一步							   			*/
+		/* 然后模拟最后一步放置块							 		*/
+		auto &myOutput = input["responses"][i - 1];
+		blockType = myOutput["block"].asInt();
+		auto &seq = myOutput["seq"];
+		auto &lastPos = seq[seq.size() - 1];
+		x = lastPos["x"].asInt();
+		y = lastPos["y"].asInt();
+		o = lastPos["o"].asInt();
 
 		// 我当时把上一块落到了 x y o！
-		Tetris myBlock(currTypeForColor[currBotColor], currBotColor);
+		Tetris myBlock(currTypeForColor[myColor], myColor);
 		myBlock.set(x, y, o).place();
 
 		// 我给对方什么块来着？
 		typeCountForColor[enemyColor][blockType]++;
 		nextTypeForColor[enemyColor] = blockType;
 
-		// 然后读自己的输入，也就是对方的行为
-		// 裁判给自己的输入只有对方的最后一步
-		cin >> blockType >> x >> y >> o;
+		/* 然后读自己的输入，也就是对方的行为   */
+		/* 裁判给自己的输入只有对方的最后一步   */
+		auto &myInput = input["requests"][i];
+		blockType = myInput["block"].asInt();
+		x = myInput["x"].asInt();
+		y = myInput["y"].asInt();
+		o = myInput["o"].asInt();
 
 		// 对方当时把上一块落到了 x y o！
 		Tetris enemyBlock(currTypeForColor[enemyColor], enemyColor);
 		enemyBlock.set(x, y, o).place();
 
 		// 对方给我什么块来着？
-		typeCountForColor[currBotColor][blockType]++;
-		nextTypeForColor[currBotColor] = blockType;
+		typeCountForColor[myColor][blockType]++;
+		nextTypeForColor[myColor] = blockType;
 
 		// 检查消去
 		Util::eliminate(0);
@@ -392,18 +417,18 @@ int main()
 
 	// 做出决策（你只需修改以下部分）
 
-	// 遇事不决先输出（平台上编译不会输出）
+	// 遇事不决先输出（平台上运行不会输出）
 	Util::printField();
 
-	// 贪心决策
-	// 从下往上以各种姿态找到第一个位置，要求能够直着落下
-	Tetris block(nextTypeForColor[currBotColor], currBotColor);
+	/* 贪心决策												*/		 
+	/* 从下往上以各种姿态找到第一个位置，要求能够直着落下		*/	    
+	Tetris block(nextTypeForColor[myColor], myColor);
 	for (int y = 1; y <= MAPHEIGHT; y++)
 		for (int x = 1; x <= MAPWIDTH; x++)
 			for (int o = 0; o < 4; o++)
 			{
 				if (block.set(x, y, o).isValid() &&
-					Util::checkDirectDropTo(currBotColor, block.blockType, x, y, o))
+					Util::checkDirectDropTo(myColor, block.blockType, x, y, o))
 				{
 					seqX[0] = x;
 					seqY[0] = y;
@@ -438,10 +463,20 @@ determined:
 
 	// 决策结束，输出结果（你只需修改以上部分）
 
-	cout << blockForEnemy << " " << seqLength;
+	Json::Value output;
+	Json::FastWriter writer;
+
+	output["response"]["block"] = blockForEnemy;
+
+	auto &seq = output["response"]["seq"];
 	for (int i = 0; i < seqLength; i++)
-		cout << " " << seqX[i] << " " << seqY[i] << " " << seqO[i];
+	{
+		seq[i]["x"] = seqX[i];
+		seq[i]["y"] = seqY[i];
+		seq[i]["o"] = seqO[i];
+	}
+
+	cout << writer.write(output);
 
 	return 0;
-
 }
