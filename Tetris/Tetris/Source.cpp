@@ -351,6 +351,9 @@ bool getJsonStr(istream& in, Json::Value& json)
 int main()
 {
 	// 加速输入
+#ifdef __APPLE__
+    freopen("/Users/whitephosphorus/Desktop/in.txt", "r", stdin);
+#endif
 	istream::sync_with_stdio(false);
 	srand((unsigned)time(nullptr));
 	init();
