@@ -16,13 +16,15 @@
 
 #ifndef _BOTZONE_ONLINE
 #include "LocalTestPackage.h"
+#else
+#define MAPWIDTH 10
+#define MAPHEIGHT 20
 #endif
-
 
 using namespace std;
 
-#define MAPWIDTH 10
-#define MAPHEIGHT 20
+//TODO modify max scoreS
+#define INF 999999999
 
 
 // 我所在队伍的颜色（0为红，1为蓝，仅表示队伍，不分先后）
@@ -61,33 +63,83 @@ const int blockShape[7][4][8] = {
 	{ { 0,0,0,1,-1,0,-1,1 },{ 0,0,-1,0,0,-1,-1,-1 },{ 0,0,0,-1,1,-0,1,-1 },{ 0,0,1,0,0,1,1,1 } }
 };// 7种形状(长L| 短L| 反z| 正z| T| 直一| 田格)，4种朝向(上左下右)，8:每相邻的两个分别为x，y
 
+
+/* 0     botzone.org			*/
+/* 1     simulate botzone.org	*/
+/* 2     Host local game		*/
+int MODE;
+
+/****************************************************************************************************/
+/******************************                                        ******************************/
+/******************************        functions and classes           ******************************/
+/******************************                                        ******************************/
+/****************************************************************************************************/
+
+// 旋转中心的x轴坐标
+// 旋转中心的y轴坐标
+// 标记方块的朝向 0~3
+struct Block
+{
+	int x, y, o;
+
+	Block() {}
+	Block(const int &x, const int &y, const int &o)
+		:x(x), y(y), o(o) {}
+
+	Block(const Json::Value& jv)
+	{
+		x = jv["x"].asInt();
+		y = jv["y"].asInt();
+		o = jv["o"].asInt();
+	}
+
+	operator Json::Value()const
+	{
+		Json::Value jv;
+		jv["x"] = x;
+		jv["y"] = y;
+		jv["o"] = o;
+		return jv;
+	}
+};
+
 class Tetris
 {
 public:
 	const int blockType;   // 标记方块类型的序号 0~6
-	int blockX;            // 旋转中心的x轴坐标
-	int blockY;            // 旋转中心的y轴坐标
-	int orientation;       // 标记方块的朝向 0~3
+	Block block;
 	const int(*shape)[8]; // 当前类型方块的形状定义
 
 	int color;
 
 	Tetris(int t, int color) : blockType(t), shape(blockShape[t]), color(color) {}
 
+
 	inline Tetris &set(int x = -1, int y = -1, int o = -1)
 	{
-		blockX = x == -1 ? blockX : x;
-		blockY = y == -1 ? blockY : y;
-		orientation = o == -1 ? orientation : o;
+
+		block.x = x == -1 ? block.x : x;
+		block.y = y == -1 ? block.y : y;
+		block.o = o == -1 ? block.o : o;
+		return *this;
+	}
+
+	inline Tetris &set(const Block& _block = { -1,-1,-1 })
+	{
+
+		block.x = _block.x == -1 ? block.x : _block.x;
+		block.y = _block.y == -1 ? block.y : _block.y;
+		block.o = _block.o == -1 ? block.o : _block.o;
 		return *this;
 	}
 
 	// 判断当前位置是否合法
 	inline bool isValid(int x = -1, int y = -1, int o = -1)
 	{
-		x = x == -1 ? blockX : x;
-		y = y == -1 ? blockY : y;
-		o = o == -1 ? orientation : o;
+
+		x = x == -1 ? block.x : x;
+		y = y == -1 ? block.y : y;
+		o = o == -1 ? block.o : o;
 		if (o < 0 || o > 3)
 			return false;
 
@@ -107,7 +159,7 @@ public:
 	// 判断是否落地
 	inline bool onGround()
 	{
-		if (isValid() && !isValid(-1, blockY - 1))
+		if (isValid() && !isValid(-1, block.y - 1))
 			return true;
 		return false;
 	}
@@ -121,8 +173,8 @@ public:
 		int i, tmpX, tmpY;
 		for (i = 0; i < 4; i++)
 		{
-			tmpX = blockX + shape[orientation][2 * i];
-			tmpY = blockY + shape[orientation][2 * i + 1];
+			tmpX = block.x + shape[block.o][2 * i];
+			tmpY = block.y + shape[block.o][2 * i + 1];
 			gridInfo[color][tmpY][tmpX] = 2;
 		}
 		return true;
@@ -134,10 +186,10 @@ public:
 		if (o < 0 || o > 3)
 			return false;
 
-		if (orientation == o)
+		if (block.o == o)
 			return true;
 
-		int fromO = orientation;
+		int fromO = block.o;
 		while (true)
 		{
 			if (!isValid(-1, -1, fromO))
@@ -153,7 +205,7 @@ public:
 };
 
 // 围一圈护城河
-void init()
+void stateInit()
 {
 	int i;
 	for (i = 0; i < MAPHEIGHT + 2; i++)
@@ -320,6 +372,28 @@ namespace Util
 	}
 }
 
+//both required in botzone.org and localTest
+int programInit()
+{
+	istream::sync_with_stdio(false);		// 加速输入
+	srand((unsigned)time(nullptr));
+	stateInit();
+#ifdef __APPLE__
+	freopen("/Users/whitephosphorus/Desktop/in.txt", "r", stdin);
+#endif
+
+#ifdef _BOTZONE_ONLINE
+	MODE = 0;
+#else
+	cout << "Local: Please enter test mode: ";
+	cin >> MODE;
+	if (cin.fail())
+		exit(0);
+#endif // _BOTZONE_ONLINE
+
+	return 0;
+}
+
 //read between { and }. return false when failure
 bool getJsonStr(istream& in, Json::Value& json)
 {
@@ -348,27 +422,16 @@ bool getJsonStr(istream& in, Json::Value& json)
 	return reader.parse(str, json);
 }
 
-int main()
+int recoverState(int(&nextType)[2])
 {
-
-#ifdef __APPLE__
-    freopen("/Users/whitephosphorus/Desktop/in.txt", "r", stdin);
-#endif
-	istream::sync_with_stdio(false);		// 加速输入
-
-	srand((unsigned)time(nullptr));
-	init();
-
-	int curTurnID, tmpBlockType;
-	int nextType[2];
-
-	// 读入JSON
+	//读入JSON
 	Json::Value input;
 	getJsonStr(cin, input);
 #ifndef _BOTZONE_ONLINE
 	interpretSeverLog(input);
 #endif // !_BOTZONE_ONLINE
 
+	int curTurnID, tmpBlockType;
 
 	/* 先读入第一回合，得到自己的颜色	*/
 	/* 双方的第一块肯定是一样的		*/
@@ -387,24 +450,22 @@ int main()
 
 	/* 然后分析以前每回合的输入输出，并恢复状态			*/
 	/* 循环中，color 表示当前这一行是 color 的行为		*/
-	
+
 	for (int i = 1; i < curTurnID; i++)
 	{
 		/* 根据这些输入输出逐渐恢复状态到当前回合					*/
 		int currType[2] = { nextType[0], nextType[1] };
-		int x, y, o;
+		Block block;
 
 		/* 先读自己的输出，也就是自己的行为						*/
 		/* 然后模拟放置块									 		*/
 		auto &myOutput = input["responses"][i - 1];
 		tmpBlockType = myOutput["block"].asInt();
-		x = myOutput["x"].asInt();
-		y = myOutput["y"].asInt();
-		o = myOutput["o"].asInt();
+		block = myOutput;
 
 		// 我当时把上一块落到了 x y o！
 		Tetris myBlock(currType[myColor], myColor);
-		myBlock.set(x, y, o).place();
+		myBlock.set(block).place();
 
 		// 我给对方什么块来着？
 		typeCount[enemyColor][tmpBlockType]++;
@@ -414,13 +475,11 @@ int main()
 		/* 裁判给自己的输入只有对方的最后一步   */
 		auto &myInput = input["requests"][i];
 		tmpBlockType = myInput["block"].asInt();
-		x = myInput["x"].asInt();
-		y = myInput["y"].asInt();
-		o = myInput["o"].asInt();
+		block = myInput;
 
 		// 对方当时把上一块落到了 x y o！
 		Tetris enemyBlock(currType[enemyColor], enemyColor);
-		enemyBlock.set(x, y, o).place();
+		enemyBlock.set(block).place();
 
 		// 对方给我什么块来着？
 		typeCount[myColor][tmpBlockType]++;
@@ -433,19 +492,21 @@ int main()
 		// 进行转移
 		Util::transfer();
 	}
+	return 0;
+}
 
-	int blockForEnemy, finalX, finalY, finalO;
+//TODO: localize varible
+int blockForEnemy;
+Block result;
 
-	// 做出决策（你只需修改以下部分）
-
-	// 遇事不决先输出（平台上运行不会输出）
-#ifndef _BOTZONE_ONLINE
-	Util::printField();
-#endif
-
+//role: host(0)/guest(1)
+int NegativeMaxSearch(
+	const int(&gridInfo)[2][MAPHEIGHT + 2][MAPWIDTH + 2],
+	const int nextBlockType, int depth, int alpha, int beta, int role)
+{
 	/* 贪心决策												*/
 	/* 从下往上以各种姿态找到第一个位置，要求能够直着落下		*/
-	Tetris block(nextType[myColor], myColor);
+	Tetris block(nextBlockType, myColor);
 	for (int y = 1; y <= MAPHEIGHT; y++)
 		for (int x = 1; x <= MAPWIDTH; x++)
 			for (int o = 0; o < 4; o++)
@@ -453,9 +514,7 @@ int main()
 				if (block.set(x, y, o).isValid() &&
 					Util::checkDirectDropTo(myColor, block.blockType, x, y, o))
 				{
-					finalX = x;
-					finalY = y;
-					finalO = o;
+					result = { x,y,o };
 					goto determined;
 				}
 			}
@@ -483,18 +542,47 @@ determined:
 		blockForEnemy = rand() % 7;
 	}
 
-	// 决策结束，输出结果（你只需修改以上部分）
 
+	return 0;
+}
+
+void outputResult(const int &blockForEnemy, const Block &result)
+{
 	Json::Value output;
 	Json::FastWriter writer;
 
 	output["response"]["block"] = blockForEnemy;
-
-	output["response"]["x"] = finalX;
-	output["response"]["y"] = finalY;
-	output["response"]["o"] = finalO;
+	output["response"] = result;
 
 	cout << writer.write(output);
+}
 
+int main()
+{
+	programInit();
+
+	if (MODE == 0 || MODE == 1)
+	{
+		int nextType[2];
+
+		recoverState(nextType);
+
+#ifndef _BOTZONE_ONLINE
+		Util::printField();
+#endif // _BOTZONE_ONLINE
+
+		NegativeMaxSearch(gridInfo, nextType[myColor], 1, -INF, INF, 0);
+
+		outputResult(blockForEnemy, result);
+	}
+#ifndef _BOTZONE_ONLINE
+	else if (MODE == 2)
+	{
+		gameEngineWork();
+	}
+#endif // _BOTZONE_ONLINE
+	else
+		exit(0);
+	
 	return 0;
 }

@@ -24,3 +24,9 @@ int interpretSeverLog(Json::Value & orig)
 	orig = ret;
 	return 0;
 }
+
+int gameEngineWork()
+{
+	
+	return 0;
+}
