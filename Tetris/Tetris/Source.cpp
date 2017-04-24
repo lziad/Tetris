@@ -1,13 +1,10 @@
-﻿/**
-* Tetris JSON交互样例程序
-* https://wiki.botzone.org/index.php?title=Tetris
-* 更新于2017年4月20日：
-* 修正了rotation函数、将交互方式修改为新规则的格式，还有transfer函数里`if (h2 >= MAPHEIGHT)`改为`if (h2 > MAPHEIGHT)`
-*/
-// 注意：x的范围是1~MAPWIDTH，y的范围是1~MAPHEIGHT
-// 数组是先行（y）后列（c）
-// 坐标系：原点在左下角
-
+﻿/*
+ * https://wiki.botzone.org/index.php?title=Tetris
+ * 注意：x的范围是1~MAPWIDTH，y的范围是1~MAPHEIGHT
+ * 数组是先行（y）后列（c）
+ * 坐标系：原点在左下角
+ * 平台保证所有输入都是合法输入
+ */
 #include <iostream>
 #include <string>
 #include <cmath>
@@ -20,11 +17,6 @@
 #ifndef _BOTZONE_ONLINE
 #include "LocalTestPackage.h"
 #endif
-
-#ifndef _BOTZONE_ONLINE
-#define LocalTest
-#endif // !_BOTZONE_ONLINE
-
 
 
 using namespace std;
@@ -57,7 +49,7 @@ int elimTotal[2] = { 0 };
 const int elimBonus[] = { 0, 1, 3, 5, 7 };
 
 // 给对应玩家的各类块的数目总计
-int typeCountForColor[2][7] = { 0 };
+int typeCount[2][7] = { 0 };
 
 const int blockShape[7][4][8] = {
 	{ { 0,0,1,0,-1,0,-1,-1 },{ 0,0,0,1,0,-1,1,-1 },{ 0,0,-1,0,1,0,1,1 },{ 0,0,0,-1,0,1,-1,1 } },
@@ -68,7 +60,6 @@ const int blockShape[7][4][8] = {
 	{ { 0,0,0,-1,0,1,0,2 },{ 0,0,1,0,-1,0,-2,0 },{ 0,0,0,1,0,-1,0,-2 },{ 0,0,-1,0,1,0,2,0 } },
 	{ { 0,0,0,1,-1,0,-1,1 },{ 0,0,-1,0,0,-1,-1,-1 },{ 0,0,0,-1,1,-0,1,-1 },{ 0,0,1,0,0,1,1,1 } }
 };// 7种形状(长L| 短L| 反z| 正z| T| 直一| 田格)，4种朝向(上左下右)，8:每相邻的两个分别为x，y
-
 
 class Tetris
 {
@@ -364,8 +355,8 @@ int main()
 	srand((unsigned)time(nullptr));
 	init();
 
-	int turnID, blockType;
-	int nextTypeForColor[2];
+	int curTurnID, tmpBlockType;
+	int nextType[2];
 
 	// 读入JSON
 	Json::Value input;
@@ -377,61 +368,59 @@ int main()
 
 	/* 先读入第一回合，得到自己的颜色	*/
 	/* 双方的第一块肯定是一样的		*/
-	turnID = input["responses"].size() + 1;
+	curTurnID = input["responses"].size() + 1;
 	auto &first = input["requests"][(Json::UInt) 0];
 
-	blockType = first["block"].asInt();
+	tmpBlockType = first["block"].asInt();
 	myColor = first["color"].asInt();
 
 	enemyColor = 1 - myColor;
-	nextTypeForColor[0] = blockType;
-	nextTypeForColor[1] = blockType;
-	typeCountForColor[0][blockType]++;
-	typeCountForColor[1][blockType]++;
+	nextType[0] = tmpBlockType;
+	nextType[1] = tmpBlockType;
+	typeCount[0][tmpBlockType]++;
+	typeCount[1][tmpBlockType]++;
 
 
 	/* 然后分析以前每回合的输入输出，并恢复状态			*/
 	/* 循环中，color 表示当前这一行是 color 的行为		*/
-	/* 平台保证所有输入都是合法输入					*/
-	for (int i = 1; i < turnID; i++)
+	
+	for (int i = 1; i < curTurnID; i++)
 	{
-		int currTypeForColor[2] = { nextTypeForColor[0], nextTypeForColor[1] };
-		int x, y, o;
 		/* 根据这些输入输出逐渐恢复状态到当前回合					*/
+		int currType[2] = { nextType[0], nextType[1] };
+		int x, y, o;
 
 		/* 先读自己的输出，也就是自己的行为						*/
-		/* 自己的输出是一个序列，但是只有最后一步有用		 		*/
-		/* 所以只保留最后一步							   			*/
-		/* 然后模拟最后一步放置块							 		*/
+		/* 然后模拟放置块									 		*/
 		auto &myOutput = input["responses"][i - 1];
-		blockType = myOutput["block"].asInt();
+		tmpBlockType = myOutput["block"].asInt();
 		x = myOutput["x"].asInt();
 		y = myOutput["y"].asInt();
 		o = myOutput["o"].asInt();
 
 		// 我当时把上一块落到了 x y o！
-		Tetris myBlock(currTypeForColor[myColor], myColor);
+		Tetris myBlock(currType[myColor], myColor);
 		myBlock.set(x, y, o).place();
 
 		// 我给对方什么块来着？
-		typeCountForColor[enemyColor][blockType]++;
-		nextTypeForColor[enemyColor] = blockType;
+		typeCount[enemyColor][tmpBlockType]++;
+		nextType[enemyColor] = tmpBlockType;
 
-		/* 然后读自己的输入，也就是对方的行为   */
+		/* 然后读对方的输入，也就是对方的行为   */
 		/* 裁判给自己的输入只有对方的最后一步   */
 		auto &myInput = input["requests"][i];
-		blockType = myInput["block"].asInt();
+		tmpBlockType = myInput["block"].asInt();
 		x = myInput["x"].asInt();
 		y = myInput["y"].asInt();
 		o = myInput["o"].asInt();
 
 		// 对方当时把上一块落到了 x y o！
-		Tetris enemyBlock(currTypeForColor[enemyColor], enemyColor);
+		Tetris enemyBlock(currType[enemyColor], enemyColor);
 		enemyBlock.set(x, y, o).place();
 
 		// 对方给我什么块来着？
-		typeCountForColor[myColor][blockType]++;
-		nextTypeForColor[myColor] = blockType;
+		typeCount[myColor][tmpBlockType]++;
+		nextType[myColor] = tmpBlockType;
 
 		// 检查消去
 		Util::eliminate(0);
@@ -440,7 +429,6 @@ int main()
 		// 进行转移
 		Util::transfer();
 	}
-
 
 	int blockForEnemy, finalX, finalY, finalO;
 
@@ -453,7 +441,7 @@ int main()
 
 	/* 贪心决策												*/
 	/* 从下往上以各种姿态找到第一个位置，要求能够直着落下		*/
-	Tetris block(nextTypeForColor[myColor], myColor);
+	Tetris block(nextType[myColor], myColor);
 	for (int y = 1; y <= MAPHEIGHT; y++)
 		for (int x = 1; x <= MAPWIDTH; x++)
 			for (int o = 0; o < 4; o++)
@@ -474,16 +462,16 @@ determined:
 	int maxCount = 0, minCount = 99;
 	for (int i = 0; i < 7; i++)
 	{
-		if (typeCountForColor[enemyColor][i] > maxCount)
-			maxCount = typeCountForColor[enemyColor][i];
-		if (typeCountForColor[enemyColor][i] < minCount)
-			minCount = typeCountForColor[enemyColor][i];
+		if (typeCount[enemyColor][i] > maxCount)
+			maxCount = typeCount[enemyColor][i];
+		if (typeCount[enemyColor][i] < minCount)
+			minCount = typeCount[enemyColor][i];
 	}
 	if (maxCount - minCount == 2)
 	{
 		// 危险，找一个不是最大的块给对方吧
 		for (blockForEnemy = 0; blockForEnemy < 7; blockForEnemy++)
-			if (typeCountForColor[enemyColor][blockForEnemy] != maxCount)
+			if (typeCount[enemyColor][blockForEnemy] != maxCount)
 				break;
 	}
 	else
