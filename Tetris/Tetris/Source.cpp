@@ -1,13 +1,12 @@
 ﻿/**
 * Tetris JSON交互样例程序
 * https://wiki.botzone.org/index.php?title=Tetris
+* 更新于2017年4月20日：
+* 修正了rotation函数、将交互方式修改为新规则的格式，还有transfer函数里`if (h2 >= MAPHEIGHT)`改为`if (h2 > MAPHEIGHT)`
 */
-
-/**
-*  注意：x的范围是1~MAPWIDTH，y的范围是1~MAPHEIGHT
-*  数组是先行（y）后列（c）
-*  坐标系：原点在左下角
-*/
+// 注意：x的范围是1~MAPWIDTH，y的范围是1~MAPHEIGHT
+// 数组是先行（y）后列（c）
+// 坐标系：原点在左下角
 
 #include <iostream>
 #include <string>
@@ -16,7 +15,7 @@
 #include <cstdlib>
 #include <ctime>
 
-#include "jsoncpp\json.h"
+#include "jsoncpp/json.h"
 
 #ifndef _BOTZONE_ONLINE
 #include "LocalTestPackage.h"
@@ -55,7 +54,7 @@ int maxHeight[2] = { 0 };
 int elimTotal[2] = { 0 };
 
 // 一次性消去行数对应分数
-const int elimBonus[4] = { 1, 3, 5, 7 };
+const int elimBonus[] = { 0, 1, 3, 5, 7 };
 
 // 给对应玩家的各类块的数目总计
 int typeCountForColor[2][7] = { 0 };
@@ -150,7 +149,7 @@ public:
 		int fromO = orientation;
 		while (true)
 		{
-			if (!isValid())
+			if (!isValid(-1, -1, fromO))
 				return false;
 
 			if (fromO == o)
@@ -253,7 +252,7 @@ namespace Util
 				swap(color1, color2);
 			int h2;
 			maxHeight[color2] = h2 = maxHeight[color2] + transCount[color1];
-			if (h2 >= MAPHEIGHT)
+			if (h2 > MAPHEIGHT)
 				return color2;
 			int i, j;
 
@@ -369,13 +368,11 @@ int main()
 	int nextTypeForColor[2];
 
 	// 读入JSON
-
 	Json::Value input;
 	getJsonStr(cin, input);
 #ifndef _BOTZONE_ONLINE
 	interpretSeverLog(input);
 #endif // !_BOTZONE_ONLINE
-
 
 
 	/* 先读入第一回合，得到自己的颜色	*/
@@ -408,11 +405,9 @@ int main()
 		/* 然后模拟最后一步放置块							 		*/
 		auto &myOutput = input["responses"][i - 1];
 		blockType = myOutput["block"].asInt();
-		auto &seq = myOutput["seq"];
-		auto &lastPos = seq[seq.size() - 1];
-		x = lastPos["x"].asInt();
-		y = lastPos["y"].asInt();
-		o = lastPos["o"].asInt();
+		x = myOutput["x"].asInt();
+		y = myOutput["y"].asInt();
+		o = myOutput["o"].asInt();
 
 		// 我当时把上一块落到了 x y o！
 		Tetris myBlock(currTypeForColor[myColor], myColor);
@@ -446,7 +441,8 @@ int main()
 		Util::transfer();
 	}
 
-	int blockForEnemy, seqX[MAPHEIGHT + 1], seqY[MAPHEIGHT + 1], seqO[MAPHEIGHT + 1], seqLength = 0;
+
+	int blockForEnemy, finalX, finalY, finalO;
 
 	// 做出决策（你只需修改以下部分）
 
@@ -465,10 +461,9 @@ int main()
 				if (block.set(x, y, o).isValid() &&
 					Util::checkDirectDropTo(myColor, block.blockType, x, y, o))
 				{
-					seqX[0] = x;
-					seqY[0] = y;
-					seqO[0] = o;
-					seqLength = 1;
+					finalX = x;
+					finalY = y;
+					finalO = o;
 					goto determined;
 				}
 			}
@@ -503,13 +498,9 @@ determined:
 
 	output["response"]["block"] = blockForEnemy;
 
-	auto &seq = output["response"]["seq"];
-	for (int i = 0; i < seqLength; i++)
-	{
-		seq[i]["x"] = seqX[i];
-		seq[i]["y"] = seqY[i];
-		seq[i]["o"] = seqO[i];
-	}
+	output["response"]["x"] = finalX;
+	output["response"]["y"] = finalY;
+	output["response"]["o"] = finalO;
 
 	cout << writer.write(output);
 
