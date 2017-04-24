@@ -24,5 +24,3 @@ int interpretSeverLog(Json::Value & orig)
 	orig = ret;
 	return 0;
 }
-
-

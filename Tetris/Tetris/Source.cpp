@@ -344,12 +344,18 @@ bool getJsonStr(istream& in, Json::Value& json)
 	if (stk != 0)
 		return false;
 
+
 	return reader.parse(str, json);
 }
 
 int main()
 {
+
+#ifdef __APPLE__
+    freopen("/Users/whitephosphorus/Desktop/in.txt", "r", stdin);
+#endif
 	istream::sync_with_stdio(false);		// 加速输入
+
 	srand((unsigned)time(nullptr));
 	init();
 
