@@ -18,9 +18,11 @@ int interpretSeverLog(Json::Value & orig)
 	{
 		ret["responses"][i] = orig["log"][2 * i + 1][to_string(myTeam)]["response"];
 	}
-	Json::FastWriter writer;
-	cout << writer.write(ret);
+
+	//Json::FastWriter writer;cout << writer.write(ret);
 
 	orig = ret;
 	return 0;
 }
+
+
