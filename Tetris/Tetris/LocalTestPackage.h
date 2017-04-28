@@ -15,7 +15,15 @@ struct Block;
 //abstruct input data from server log
 int interpretSeverLog(Json::Value& orig);
 
-int NegativeMaxSearch(
+namespace Sample
+{
+	int sampleStrategy(
+		const int(&gridInfo)[2][MAPHEIGHT + 2][MAPWIDTH + 2], int(&typeCount)[2][7],
+		const int nextBlockType, int depth, int alpha, int beta, int role);
+
+}
+
+int negativeMaxSearch(
 	const int(&gridInfo)[2][MAPHEIGHT + 2][MAPWIDTH + 2],
 	const int nextBlockType, int depth, int alpha, int beta, int role);
 
