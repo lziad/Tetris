@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <iostream>
 #include <string>
 
@@ -20,11 +20,10 @@ namespace Sample
 	int sampleStrategy(
 		const int(&gridInfo)[2][MAPHEIGHT + 2][MAPWIDTH + 2], int(&typeCount)[2][7],
 		const int nextBlockType, int depth, int alpha, int beta, int role);
-
 }
 
 int negativeMaxSearch(
-	const int(&gridInfo)[2][MAPHEIGHT + 2][MAPWIDTH + 2],
+	const int(&gridInfo)[2][MAPHEIGHT + 2][MAPWIDTH + 2],int(&typeCount)[2][7],
 	const int nextBlockType, int depth, int alpha, int beta, int role);
 
 int gameEngineWork();

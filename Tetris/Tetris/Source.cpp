@@ -425,7 +425,7 @@ int programInit()
 	return 0;
 }
 
-//read between { and }. return false when failure
+//read between { and } return false when failure
 bool getJsonStr(istream& in, Json::Value& json)
 {
 	string str;
@@ -545,10 +545,8 @@ int recoverState(int(&grid)[2][MAPHEIGHT + 2][MAPWIDTH + 2],
 	return 0;
 }
 
-//role: host(0)/guest(1)
-
 int negativeMaxSearch(
-	const int(&gridInfo)[2][MAPHEIGHT + 2][MAPWIDTH + 2],
+	const int(&gridInfo)[2][MAPHEIGHT + 2][MAPWIDTH + 2], int(&typeCount)[2][7],
 	const int nextBlockType, int depth, int alpha, int beta, int role)
 {
 	return 0;
