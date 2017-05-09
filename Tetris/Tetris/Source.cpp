@@ -103,6 +103,8 @@ namespace Sample
 	int transCount[2] = { 0 };
 	// 运行eliminate后的当前高度
 	int maxHeight[2] = { 0 };
+    // 双方分数，用于平局时判断
+    int score[2] = { 0 };
 
 	class Tetris
 	{
@@ -262,6 +264,7 @@ namespace Sample
 				}
 		}
 		Sample::maxHeight[color] -= count;
+        Sample::score[color] += elimBonus[count];
 	}
 
 	// 转移双方消去的行，返回-1表示继续，否则返回输者
@@ -296,7 +299,11 @@ namespace Sample
 			Sample::maxHeight[color1] = h1 = Sample::maxHeight[color1] + Sample::transCount[color2];//从color1处移动count1去color2
 			Sample::maxHeight[color2] = h2 = Sample::maxHeight[color2] + Sample::transCount[color1];
 
-			if (h1 > MAPHEIGHT) return color1;
+            if (h1 > MAPHEIGHT) {
+                if (h2 > MAPHEIGHT)
+                    return (score[color1] < score[color2] ? color1 : color2);
+                return color1;
+            }
 			if (h2 > MAPHEIGHT) return color2;
 
 			int i, j;
@@ -350,7 +357,7 @@ namespace Sample
 			cout << endl;
 		}
 		cout << endl;
-		cout << "（图例： ~~：墙，[]：块，##：新块）" << endl << endl;
+		//cout << "（图例： ~~：墙，[]：块，##：新块）" << endl << endl;
 	}
 
 	//样例决策
@@ -402,6 +409,12 @@ namespace Sample
 		return 0;
 	}
 
+}
+
+bool setAndJudge(int nextType, int role) {
+    Sample::Tetris tmp(nextType, role);
+    tmp.set(result);
+    return tmp.place();
 }
 
 //both required in botzone.org and localTest
