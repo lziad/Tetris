@@ -1,4 +1,4 @@
-#include "LocalTestPackage.h"
+﻿#include "LocalTestPackage.h"
 
 int interpretSeverLog(Json::Value & orig)
 {
