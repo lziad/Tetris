@@ -27,51 +27,52 @@ int interpretSeverLog(Json::Value & orig)
 
 int gameEngineWork()
 {
-    // init
-    int nextType[2] = { 0 };
-    int typeCount[2][7] = { 0 };
-    int loser = -1;
-    stateInit(Sample::gridInfo);
+	// init
+	int nextType[2] = { 0 };
+	int typeCount[2][7] = { 0 };
+	int loser = -1;
+	stateInit(Sample::gridInfo);
 	Sample::printField(Sample::gridInfo);
-    
-    // Game start
-    while (true) {
-        // 决策、放方块，检测是否有人挂了
-        Sample::sampleStrategy(Sample::gridInfo, typeCount, nextType[0], 1, -INF, INF, 0);
-        int tmp = blockForEnemy;
-        if (!setAndJudge(nextType[0], 0)) {
-            cout << "Player 0 lose!" << endl;
-            break;
-        }
-        
-        Sample::sampleStrategy(Sample::gridInfo, typeCount, nextType[1], 1, -INF, INF, 1);
-        if (!setAndJudge(nextType[1], 1)) {
-            cout << "Player 1 lose!" << endl;
-            break;
-        }
-        
-        // 每回合输出一次
-        Sample::printField(Sample::gridInfo);
-        
-        nextType[0] = blockForEnemy;
-        nextType[1] = tmp;
-        
-        // 检查消去
-        Sample::eliminate(0);
-        Sample::eliminate(1);
-        
-        // 进行转移
-        loser = Sample::transfer();
-        if (loser != -1) {
-            cout << "Player " << loser << " lose!" << endl;
-            break;
-        }
-    }
-    
-    // 终局图
-    Sample::printField(Sample::gridInfo);
-    // 输出一下分数
-    cout << "Scores: " << Sample::score[0] << " vs " << Sample::score[1] << endl;
-    
+
+	// Game start
+	while (true) {
+		// 决策、放方块，检测是否有人挂了
+		Sample::sampleStrategy(Sample::gridInfo, typeCount, nextType[0], 1, -INF, INF, 0);
+		int tmp = blockForEnemy;
+		if (!setAndJudge(nextType[0], 0)) {
+			cout << "Player 0 lose!" << endl;
+			break;
+		}
+
+		Sample::sampleStrategy(Sample::gridInfo, typeCount, nextType[1], 1, -INF, INF, 1);
+		if (!setAndJudge(nextType[1], 1)) {
+			cout << "Player 1 lose!" << endl;
+			break;
+		}
+
+		// 每回合输出一次
+		Sample::printField(Sample::gridInfo, 1200);
+
+		nextType[0] = blockForEnemy;
+		nextType[1] = tmp;
+
+		// 检查消去
+		Sample::eliminate(0);
+		Sample::eliminate(1);
+
+		// 进行转移
+		loser = Sample::transfer();
+		if (loser != -1) {
+			cout << "Player " << loser << " lose!" << endl;
+			break;
+		}
+	}
+
+	// 终局图
+	Sample::printField(Sample::gridInfo, 1200);
+	// 输出一下分数
+	cout << "Scores: " << Sample::score[0] << " vs " << Sample::score[1] << endl;
+
 	return 0;
 }
+
