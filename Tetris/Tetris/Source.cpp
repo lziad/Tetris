@@ -5,79 +5,35 @@
  * 坐标系：原点在左下角
  * 平台保证所有输入都是合法输入
  */
-#include <iostream>
-#include <algorithm>
-#include <cstring>
-#include <string>
-#include <cmath>
-#include <cstdlib>
-#include <ctime>
-#include "jsoncpp/json.h"
 
-#ifndef _BOTZONE_ONLINE
 #include "LocalTestPackage.h"
-#else
-#define MAPWIDTH 10
-#define MAPHEIGHT 20
-#endif
 
-using namespace std;
+ /****************************************************************************************************/
+ /******************************                                        ******************************/
+ /******************************               defination               ******************************/
+ /******************************                                        ******************************/
+ /****************************************************************************************************/
 
-//TODO modify max scores
-#define INF 999999999
-
-// 7种形状(长L| 短L| 反z| 正z| T| 直一| 田格)，4种朝向(上左下右)，8:每相邻的两个分别为x，y
-const int blockShape[7][4][8] = {
-	{ { 0,0,1,0,-1,0,-1,-1 },{ 0,0,0,1,0,-1,1,-1 },{ 0,0,-1,0,1,0,1,1 },{ 0,0,0,-1,0,1,-1,1 } },
-	{ { 0,0,-1,0,1,0,1,-1 },{ 0,0,0,-1,0,1,1,1 },{ 0,0,1,0,-1,0,-1,1 },{ 0,0,0,1,0,-1,-1,-1 } },
-	{ { 0,0,1,0,0,-1,-1,-1 },{ 0,0,0,1,1,0,1,-1 },{ 0,0,-1,0,0,1,1,1 },{ 0,0,0,-1,-1,0,-1,1 } },
-	{ { 0,0,-1,0,0,-1,1,-1 },{ 0,0,0,-1,1,0,1,1 },{ 0,0,1,0,0,1,-1,1 },{ 0,0,0,1,-1,0,-1,-1 } },
-	{ { 0,0,-1,0,0,1,1,0 },{ 0,0,0,-1,-1,0,0,1 },{ 0,0,1,0,0,-1,-1,0 },{ 0,0,0,1,1,0,0,-1 } },
-	{ { 0,0,0,-1,0,1,0,2 },{ 0,0,1,0,-1,0,-2,0 },{ 0,0,0,1,0,-1,0,-2 },{ 0,0,-1,0,1,0,2,0 } },
-	{ { 0,0,0,1,-1,0,-1,1 },{ 0,0,-1,0,0,-1,-1,-1 },{ 0,0,0,-1,1,-0,1,-1 },{ 0,0,1,0,0,1,1,1 } }
-};
-
-// 一次性消去行数对应分数
-const int elimBonus[] = { 0, 1, 3, 5, 7 };
-
-/****************************************************************************************************/
-/******************************                                        ******************************/
-/******************************               declaration              ******************************/
-/******************************                                        ******************************/
-/****************************************************************************************************/
-
-struct Block;
-
-/****************************************************************************************************/
-/******************************                                        ******************************/
-/******************************               defination               ******************************/
-/******************************                                        ******************************/
-/****************************************************************************************************/
-
-/* 0     botzone.org			*/
-/* 1     simulate botzone.org	*/
-/* 2     Host local game		*/
+ /* 0     botzone.org			*/
+ /* 1     simulate botzone.org	*/
+ /* 2     Host local game		*/
 int MODE;
 
-/* 旋转中心的x轴坐标	   */
-/* 旋转中心的y轴坐标	   */
-/* 标记方块的朝向 0~3	   */
-struct Block
-{
-	int x, y, o;
+int blockForEnemy;
 
-	Block() {}
-	Block(const int &x, const int &y, const int &o)
+Block result;
+
+Block::Block(const int &x, const int &y, const int &o)
 		:x(x), y(y), o(o) {}
 
-	Block(const Json::Value& jv)
+Block::Block(const Json::Value& jv)
 	{
 		x = jv["x"].asInt();
 		y = jv["y"].asInt();
 		o = jv["o"].asInt();
 	}
 
-	operator Json::Value()const
+Block::operator Json::Value()const
 	{
 		Json::Value jv;
 		jv["x"] = x;
@@ -85,11 +41,6 @@ struct Block
 		jv["o"] = o;
 		return jv;
 	}
-};
-
-int blockForEnemy;	//TODO: localize varible
-
-Block result;
 
 namespace Sample
 {
@@ -106,106 +57,93 @@ namespace Sample
 	// 双方分数，用于平局时判断
 	int score[2] = { 0 };
 
-	class Tetris
+	Tetris &Tetris::set(int x, int y, int o)
 	{
-	public:
-		const int blockType;   // 标记方块类型的序号 0~6
-		Block block;
-		const int(*shape)[8]; // 当前类型方块的形状定义
 
-		int color;
+		block.x = x == -1 ? block.x : x;
+		block.y = y == -1 ? block.y : y;
+		block.o = o == -1 ? block.o : o;
+		return *this;
+	}
 
-		Tetris(int t, int color) : blockType(t), shape(blockShape[t]), color(color) {}
+	Tetris &Tetris::set(const Block& _block)
+	{
 
+		block.x = _block.x == -1 ? block.x : _block.x;
+		block.y = _block.y == -1 ? block.y : _block.y;
+		block.o = _block.o == -1 ? block.o : _block.o;
+		return *this;
+	}
 
-		inline Tetris &set(int x = -1, int y = -1, int o = -1)
-		{
+	// 判断当前位置是否合法
+	bool Tetris::isValid(int x, int y, int o)
+	{
 
-			block.x = x == -1 ? block.x : x;
-			block.y = y == -1 ? block.y : y;
-			block.o = o == -1 ? block.o : o;
-			return *this;
-		}
-
-		inline Tetris &set(const Block& _block = { -1,-1,-1 })
-		{
-
-			block.x = _block.x == -1 ? block.x : _block.x;
-			block.y = _block.y == -1 ? block.y : _block.y;
-			block.o = _block.o == -1 ? block.o : _block.o;
-			return *this;
-		}
-
-		// 判断当前位置是否合法
-		inline bool isValid(int x = -1, int y = -1, int o = -1)
-		{
-
-			x = x == -1 ? block.x : x;
-			y = y == -1 ? block.y : y;
-			o = o == -1 ? block.o : o;
-			if (o < 0 || o > 3)
-				return false;
-
-			int i, tmpX, tmpY;
-			for (i = 0; i < 4; i++)
-			{
-				tmpX = x + shape[o][2 * i];
-				tmpY = y + shape[o][2 * i + 1];
-				if (tmpX < 1 || tmpX > MAPWIDTH ||
-					tmpY < 1 || tmpY > MAPHEIGHT ||
-					Sample::gridInfo[color][tmpY][tmpX] != 0)
-					return false;
-			}
-			return true;
-		}
-
-		// 判断是否落地
-		inline bool onGround()
-		{
-			if (isValid() && !isValid(-1, block.y - 1))
-				return true;
+		x = x == -1 ? block.x : x;
+		y = y == -1 ? block.y : y;
+		o = o == -1 ? block.o : o;
+		if (o < 0 || o > 3)
 			return false;
-		}
 
-		// 将方块放置在场地上
-		inline bool place()
+		int i, tmpX, tmpY;
+		for (i = 0; i < 4; i++)
 		{
-			if (!onGround())
+			tmpX = x + shape[o][2 * i];
+			tmpY = y + shape[o][2 * i + 1];
+			if (tmpX < 1 || tmpX > MAPWIDTH ||
+				tmpY < 1 || tmpY > MAPHEIGHT ||
+				Sample::gridInfo[color][tmpY][tmpX] != 0)
+				return false;
+		}
+		return true;
+	}
+
+	// 判断是否落地
+	bool Tetris::onGround()
+	{
+		if (isValid() && !isValid(-1, block.y - 1))
+			return true;
+		return false;
+	}
+
+	// 将方块放置在场地上
+	bool Tetris::place()
+	{
+		if (!onGround())
+			return false;
+
+		int i, tmpX, tmpY;
+		for (i = 0; i < 4; i++)
+		{
+			tmpX = block.x + shape[block.o][2 * i];
+			tmpY = block.y + shape[block.o][2 * i + 1];
+			Sample::gridInfo[color][tmpY][tmpX] = 2;
+		}
+		return true;
+	}
+
+	// 检查能否逆时针旋转自己到o
+	bool Tetris::rotation(int o)
+	{
+		if (o < 0 || o > 3)
+			return false;
+
+		if (block.o == o)
+			return true;
+
+		int fromO = block.o;
+		while (true)
+		{
+			if (!isValid(-1, -1, fromO))
 				return false;
 
-			int i, tmpX, tmpY;
-			for (i = 0; i < 4; i++)
-			{
-				tmpX = block.x + shape[block.o][2 * i];
-				tmpY = block.y + shape[block.o][2 * i + 1];
-				Sample::gridInfo[color][tmpY][tmpX] = 2;
-			}
-			return true;
+			if (fromO == o)
+				break;
+
+			fromO = (fromO + 1) % 4;
 		}
-
-		// 检查能否逆时针旋转自己到o
-		inline bool rotation(int o)
-		{
-			if (o < 0 || o > 3)
-				return false;
-
-			if (block.o == o)
-				return true;
-
-			int fromO = block.o;
-			while (true)
-			{
-				if (!isValid(-1, -1, fromO))
-					return false;
-
-				if (fromO == o)
-					break;
-
-				fromO = (fromO + 1) % 4;
-			}
-			return true;
-		}
-	};
+		return true;
+	}
 
 	// 检查能否从场地顶端直接落到当前位置
 	inline bool checkDirectDropTo(int color, int blockType, int x, int y, int o)
@@ -268,7 +206,6 @@ namespace Sample
 	}
 
 	// 转移双方消去的行，返回-1表示继续，否则返回输者
-
 	int transfer()
 	{
 		int color1 = 0, color2 = 1;
@@ -414,12 +351,6 @@ namespace Sample
 		return 0;
 	}
 
-}
-
-bool setAndJudge(int nextType, int role) {
-	Sample::Tetris tmp(nextType, role);
-	tmp.set(result);
-	return tmp.place();
 }
 
 //both required in botzone.org and localTest

@@ -69,10 +69,15 @@ int gameEngineWork()
 	}
 
 	// 终局图
-	Sample::printField(Sample::gridInfo, 1200);
+	Sample::printField(Sample::gridInfo, 600);
 	// 输出一下分数
 	cout << "Scores: " << Sample::score[0] << " vs " << Sample::score[1] << endl;
 
 	return 0;
 }
 
+bool setAndJudge(int nextType, int role) {
+	Sample::Tetris tmp(nextType, role);
+	tmp.set(result);
+	return tmp.place();
+}
