@@ -105,9 +105,14 @@ namespace Sample
 	int transfer();
 
 	inline bool canPut(int color, int blockType);
+    
+    bool canPutThere(int color, int blockType, int x, int y, int o);
 
 	void printField(const int(&gridInfo)[2][MAPHEIGHT + 2][MAPWIDTH + 2], int delayMs = 0, bool clean = true);
 
+    int evaluate(const int(&gridInfo)[2][MAPHEIGHT + 2][MAPWIDTH + 2],
+        const int nextBlockType, int role);
+    
 	int sampleStrategy(
 		const int(&gridInfo)[2][MAPHEIGHT + 2][MAPWIDTH + 2], int(&typeCount)[2][7],
 		const int nextBlockType, int depth, int alpha, int beta, int role);
