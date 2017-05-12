@@ -50,6 +50,15 @@ Block::operator Json::Value()const
 	return jv;
 }
 
+bool operator==(const State &a, const State &b)
+{
+	if (a.nextType != b.nextType)return false;
+	if (memcmp(a.typeCount, b.typeCount, sizeof(a.typeCount)))return false;
+	if (memcmp(a.grids, b.grids, sizeof(a.grids)))return false;
+	return true;
+}
+
+
 namespace Sample
 {
 	/* 先y后x，记录地图状态，0为空，1为以前放置，2为刚刚放置，负数为越界	  */
@@ -502,7 +511,7 @@ int Ai::negativeMaxSearch(const State &curState, int depth, int alpha, int beta,
 	}
 
 
-	int totInfo;
+	int totInfo = 0;
 	StateInfo info[180];
 	int index[180];
 	// 产生所有的走法
@@ -520,13 +529,12 @@ int Ai::negativeMaxSearch(const State &curState, int depth, int alpha, int beta,
 	}
 	*/
 
-
-	qsort(index, totInfo, sizeof(int), IndexCmp(info).operator());
+	sort(index, index + totInfo, IndexCmp(info));
 
 	int new_alpha = alpha;
 	Block bestChoice{ 0,0,0 };
 
-	score = -INFINITY;
+	score = -INF;
 
 	for (int i = 0; i < totInfo; ++i) {
 
@@ -568,9 +576,9 @@ int Ai::negativeMaxSearch(const State &curState, int depth, int alpha, int beta,
 	return score;
 }
 
-int Ai::IndexCmp::operator ()(const void *va, const void *vb)const
+bool Ai::IndexCmp::operator ()(const int a, const int b)const
 {
-	return info[*(const int*)va].score - info[*(const int*)vb].score;
+	return info[a].score - info[b].score;
 }
 
 void outputResult(const int &blockForEnemy, const Block &result)
@@ -701,7 +709,7 @@ State::State(const int(&_grid)[MAPHEIGHT][MAPWIDTH],
 	{
 		for (int j = 0; j < 10; j++)
 		{
-			grids[i][j] = _grid[i][j];
+			grids[i][j] = (bool)_grid[i][j];
 		}
 	}
 	memcpy(typeCount, _typeCount, sizeof(typeCount));
@@ -719,12 +727,12 @@ State::operator Int256()const
 		for (int i = 0; i < 63; i++)
 		{
 			if (grids[(d * 64 + i) / 10][(d * 64 + i) % 10])
-				ret.data[d] += 1 << i;
+				ret.data[d] += 1ull << i;
 		}
 	}
 	for (int i = 2; i < 9; i++)
 		if (grids[19][i])
-			ret.data[3] += 1 << i;
+			ret.data[3] += 1ull << i;
 	for (int i = 0; i < 7; i++)
 	{
 		ret.data[3] += typeCount[i] << (i * 2 + 10);

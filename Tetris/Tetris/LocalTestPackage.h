@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <chrono>
 #include <thread>
+#include <functional>
 
 #include <algorithm>
 #include <map>
@@ -134,8 +135,7 @@ int gameEngineWork();
 
 bool canReach(int color, int blockType, int x, int y, int o);
 
-int evaluate(const int(&gridInfo)[2][MAPHEIGHT + 2][MAPWIDTH + 2],
-	const int nextBlockType, int role);
+int evaluate(const State &state, int role);
 
 void printField(const int(&gridInfo)[2][MAPHEIGHT + 2][MAPWIDTH + 2], int delayMs = 0, bool clean = true);
 
@@ -147,11 +147,14 @@ struct Int256
 	Int256() :data{ 0,0,0,0 } {}
 };
 
-template<class T>struct std::hash;
+
+bool operator== (const State &a, const State &b);
+
 // 20*10 + 7*2 + 3 = 217 bits in total
 struct State
 {
 	friend struct std::hash<State>;
+	friend bool operator== (const State &a, const State &b);
 
 	bool grids[20][10];
 	//TODO simplized to 0 1 2 3 (normally won't exceed 2)
@@ -184,7 +187,7 @@ struct Ai
 
 	void GenerateStrategy(const State(&states)[2]);
 
-	int negativeMaxSearch(const State(&states), int depth, int alpha, int beta, int role);
+	int Ai::negativeMaxSearch(const State &curState, int depth, int alpha, int beta, int role)
 
 	struct StateInfo
 	{
@@ -198,7 +201,7 @@ struct Ai
 	{
 		const StateInfo(&info)[180];
 		IndexCmp(const StateInfo(&info)[180]) :info(info) {}
-		int operator()(const void *va, const void *vb)const;
+		bool operator()(const int a, const int b)const;
 	};
 
 };
