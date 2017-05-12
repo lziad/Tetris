@@ -1,5 +1,7 @@
 ﻿#include "LocalTestPackage.h"
 
+#define PrintFieldDelay 500
+
 int interpretSeverLog(Json::Value & orig)
 {
 	if (orig["log"].type() == Json::nullValue)
@@ -32,7 +34,7 @@ int gameEngineWork()
 	int typeCount[2][7] = { 0 };
 	int loser = -1;
 	stateInit(Sample::gridInfo);
-	Sample::printField(Sample::gridInfo);
+	printField(Sample::gridInfo);
 
 	// Game start
 	while (true) {
@@ -51,7 +53,7 @@ int gameEngineWork()
 		}
 
 		// 每回合输出一次
-		Sample::printField(Sample::gridInfo, 1200);
+		printField(Sample::gridInfo, PrintFieldDelay);
 
 		nextType[0] = blockForEnemy;
 		nextType[1] = tmp;
@@ -69,7 +71,7 @@ int gameEngineWork()
 	}
 
 	// 终局图
-	Sample::printField(Sample::gridInfo, 600);
+	printField(Sample::gridInfo, PrintFieldDelay);
 	// 输出一下分数
 	cout << "Scores: " << Sample::score[0] << " vs " << Sample::score[1] << endl;
 
@@ -80,4 +82,27 @@ bool setAndJudge(int nextType, int role) {
 	Sample::Tetris tmp(nextType, role);
 	tmp.set(result);
 	return tmp.place();
+}
+
+// 打印场地用于调试
+void printField(const int(&gridInfo)[2][MAPHEIGHT + 2][MAPWIDTH + 2], int delayMs, bool clean)
+{
+	if (delayMs)
+		sleep(delayMs);
+	if (clean)
+		system("cls");
+
+	static const char *i2s[] = { "~~","~~","  ","[]","{}" };
+
+	cout << endl;
+	for (int y = MAPHEIGHT + 1; y >= 0; y--)
+	{
+		for (int x = 0; x <= MAPWIDTH + 1; x++)
+			cout << i2s[gridInfo[0][y][x] + 2];
+		for (int x = 0; x <= MAPWIDTH + 1; x++)
+			cout << i2s[gridInfo[1][y][x] + 2];
+		cout << endl;
+	}
+	cout << endl;
+	//cout << "（图例： ~~：墙，[]：块，{}：新块）" << endl << endl;
 }

@@ -1,6 +1,6 @@
 ﻿#pragma once
 #include <iostream>
-#include <algorithm>
+
 #include <cstring>
 #include <string>
 #include <ctime>
@@ -9,14 +9,22 @@
 #include <chrono>
 #include <thread>
 
+#include <algorithm>
+#include <map>
+#include <unordered_map>
+
 #include "jsoncpp/json.h"
 
 #define MAPHEIGHT 20
 #define MAPWIDTH 10
 #define INF 999999999 //TODO modify max scores
+#define DEPTH 4
+#define WIN_SCORE 999999999
+#define ULL unsigned long long
 #define sleep(ms) std::this_thread::sleep_for(std::chrono::milliseconds(ms))
 
 using namespace std;
+using namespace std::placeholders;
 
 // 7种形状(长L| 短L| 反z| 正z| T| 直一| 田格)，4种朝向(上左下右)，8:每相邻的两个分别为x，y
 const int blockShape[7][4][8] = {
@@ -40,6 +48,8 @@ const int elimBonus[] = { 0, 1, 3, 5, 7 };
 
 struct Block;
 
+struct State;
+
 extern int MODE;
 
 extern int blockForEnemy;
@@ -57,6 +67,7 @@ struct Block
 
 	operator Json::Value()const;
 };
+
 
 namespace Sample
 {
@@ -104,15 +115,8 @@ namespace Sample
 
 	int transfer();
 
-	inline bool canPut(int color, int blockType);
-    
-    bool canPutThere(int color, int blockType, int x, int y, int o);
+	inline bool canContinue(int color, int blockType);
 
-	void printField(const int(&gridInfo)[2][MAPHEIGHT + 2][MAPWIDTH + 2], int delayMs = 0, bool clean = true);
-
-    int evaluate(const int(&gridInfo)[2][MAPHEIGHT + 2][MAPWIDTH + 2],
-        const int nextBlockType, int role);
-    
 	int sampleStrategy(
 		const int(&gridInfo)[2][MAPHEIGHT + 2][MAPWIDTH + 2], int(&typeCount)[2][7],
 		const int nextBlockType, int depth, int alpha, int beta, int role);
@@ -121,12 +125,80 @@ namespace Sample
 //abstruct input data from server log
 int interpretSeverLog(Json::Value& orig);
 
-void stateInit(int(&grid)[2][MAPHEIGHT + 2][MAPWIDTH + 2]);
+void stateInit(int(&grids)[2][MAPHEIGHT + 2][MAPWIDTH + 2]);
 
-int negativeMaxSearch(
-	const int(&gridInfo)[2][MAPHEIGHT + 2][MAPWIDTH + 2], int(&typeCount)[2][7],
-	const int nextBlockType, int depth, int alpha, int beta, int role);
 
 bool setAndJudge(int, int);
 
 int gameEngineWork();
+
+bool canReach(int color, int blockType, int x, int y, int o);
+
+int evaluate(const int(&gridInfo)[2][MAPHEIGHT + 2][MAPWIDTH + 2],
+	const int nextBlockType, int role);
+
+void printField(const int(&gridInfo)[2][MAPHEIGHT + 2][MAPWIDTH + 2], int delayMs = 0, bool clean = true);
+
+
+
+struct Int256
+{
+	ULL data[4];
+	Int256() :data{ 0,0,0,0 } {}
+};
+
+template<class T>struct std::hash;
+// 20*10 + 7*2 + 3 = 217 bits in total
+struct State
+{
+	friend struct std::hash<State>;
+
+	bool grids[20][10];
+	//TODO simplized to 0 1 2 3 (normally won't exceed 2)
+	short typeCount[7];
+	short nextType;
+	State() {}
+	State(const int(&_grid)[MAPHEIGHT][MAPWIDTH],
+		const int(&_typeCount)[7], const int nextType);
+	operator Int256()const;
+
+};
+
+namespace std
+{
+	template<>
+	struct hash<State>
+	{
+		typedef unsigned result_type;
+		typedef State argument_type;
+		unsigned operator()(const State &state)const;
+
+	};
+}
+
+struct Ai
+{
+	unordered_map<State, int> mp;
+
+	Block bestChoice;
+
+	void GenerateStrategy(const State(&states)[2]);
+
+	int negativeMaxSearch(const State(&states), int depth, int alpha, int beta, int role);
+
+	struct StateInfo
+	{
+		State state;
+		Block choice;
+		int score;
+		int id;
+	};
+
+	struct IndexCmp
+	{
+		const StateInfo(&info)[180];
+		IndexCmp(const StateInfo(&info)[180]) :info(info) {}
+		int operator()(const void *va, const void *vb)const;
+	};
+
+};
