@@ -84,7 +84,7 @@ namespace Sample
 	}
 
 	// 判断当前位置是否合法
-	bool Tetris::isValid(int x, int y, int o)
+	inline bool Tetris::isValid(int x, int y, int o)
 	{
 
 		x = x == -1 ? block.x : x;
@@ -286,6 +286,79 @@ namespace Sample
 				}
 		return false;
 	}
+    
+    // 能不能以o的姿势放到(x, y)这个位置且刚好挨地
+    bool canPutThere(int color, int blockType, int x, int y, int o)
+    {
+        Tetris t(blockType, color);
+        if (y > 1) {
+            t.set(x, y-1, o);
+            if (t.isValid()) {
+                // 都没挨地！
+                return false;
+            }
+        }
+        
+        int can[MAPWIDTH+1] = {0};
+        // 枚举出最顶上那行所有可能的姿态和位置
+        for (int i = 1; i <= MAPWIDTH; ++i) {
+            for (int k = 0; k < 4; ++k) {
+                t.set(i, MAPHEIGHT-1, k);
+                if (t.isValid()) {
+                    can[i] |= (1 << k);
+                }
+            }
+        }
+        // 往下降一格，每个方块原地转转看看行不行，再往左看看行不行，再原地转转看看行不行
+        for (int j = MAPHEIGHT-1; j > y; --j) {
+            for (int i = 1; i <= MAPWIDTH; ++i) {
+                // 原地转；can[i] == 15就是哪个方向都行，就不用转了
+                for (int k = 0; k < 4 && can[i] != 15; ++k) {
+                    if (!(can[i] & (1 << k)))
+                        continue;
+                    int z = (k + 1) & 3;
+                    while (can[i] != 15) {
+                        t.set(i, j, z);
+                        if (!t.isValid())
+                            break;
+                        can[i] |= (1 << z);
+                        z = (++z) & 3;
+                    }
+                }
+                // 往左
+                for (int k = 0; k < 4; ++k) {
+                    int p = i;
+                    while (--p && !(can[p] & (1 << k))) {
+                        t.set(p, j, k);
+                        if (t.isValid()) {
+                            can[p] |= (1 << k);
+                            // 再转转
+                            int z = (k + 1) & 3;
+                            while (can[p] != 15) {
+                                t.set(p, j, z);
+                                if (!t.isValid())
+                                    break;
+                                can[p] |= (1 << z);
+                                z = (++z) & 3;
+                            }
+                        }
+                    }
+                }
+            }
+            // 掉不下去的就不管了
+            for (int i = 1; i <= MAPWIDTH; ++i) {
+                for (int k = 0; k < 4; ++k) {
+                    if (!(can[i] & (1 << k)))
+                        continue;
+                    t.set(i, j-1, k);
+                    if (!t.isValid()) {
+                        can[i] &= ~(1 << k);
+                    }
+                }
+            }
+        }
+        return can[x] & (1 << o);
+    }
 
 	// 打印场地用于调试
 	void printField(const int(&gridInfo)[2][MAPHEIGHT + 2][MAPWIDTH + 2], int delayMs, bool clean)
@@ -309,6 +382,40 @@ namespace Sample
 		cout << endl;
 		//cout << "（图例： ~~：墙，[]：块，{}：新块）" << endl << endl;
 	}
+    
+    int evaluate(const int(&gridInfo)[2][MAPHEIGHT + 2][MAPWIDTH + 2],
+                 const int nextBlockType, int role)
+    {
+        // 每空一行100
+        int ret = (MAPHEIGHT - maxHeight[role]) * 100;
+        int blanks[MAPHEIGHT+1]={0};
+        Tetris t(nextBlockType, role);
+        
+        // 可以消行的奖励多一些（每行150）
+        for (int y = maxHeight[role]; y >= 1; --y) {
+            blanks[y] = count_if(gridInfo[role][y]+1, gridInfo[role][y]+MAPWIDTH+1,
+                                 [](int a) -> bool { return a == 0; });
+        }
+        
+        for (int y = maxHeight[role]+2; y >= 1; --y) {
+            if (blanks[y] > 3 && !(blanks[y] == 4 && nextBlockType == 5))
+                continue;
+            for (int x = 1; x <= MAPWIDTH; ++x) {
+                for (int o = 0; o < 4; ++o) {
+                    if (canPutThere(role, nextBlockType, x, y, o)) {
+                        for (int i = 1; i < 8; i += 2) {
+                            int index = y + blockShape[nextBlockType][o][i];
+                            if (!--blanks[index]) {
+                                ret += 150;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        return ret;
+    }
 
 	//样例决策
 	int sampleStrategy(
