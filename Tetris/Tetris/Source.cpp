@@ -496,7 +496,7 @@ int Ai::negativeMaxSearch(const State &curState, int depth, int alpha, int beta,
 	// 搜索深度达到 DEPTH + 1 ，已经胜利(改成不能放），则返回
 	score = evaluate(curState, role);
 	if (depth == DEPTH + 1 || depth > 1 && abs(score) > WIN_SCORE) {
-		// 不同深度是否需要不同结果
+		// 不同深度是否需要不同结果？
 		mp.insert({ curState, score });
 		return score;
 	}
@@ -506,7 +506,7 @@ int Ai::negativeMaxSearch(const State &curState, int depth, int alpha, int beta,
 	StateInfo info[180];
 	int index[180];
 	// 产生所有的走法
-	GenerateAllPossibleMove(curState, info, totInfo);
+	//GenerateAllPossibleMove(curState, info, totInfo);
 	for (int i = 0; i < totInfo; i++)index[i] = i;
 
 	/*
@@ -523,8 +523,6 @@ int Ai::negativeMaxSearch(const State &curState, int depth, int alpha, int beta,
 
 	qsort(index, totInfo, sizeof(int), IndexCmp(info).operator());
 
-
-	// 开始 NegamaxSearch 过程
 	int new_alpha = alpha;
 	Block bestChoice{ 0,0,0 };
 
@@ -534,21 +532,20 @@ int Ai::negativeMaxSearch(const State &curState, int depth, int alpha, int beta,
 
 		StateInfo &cur = info[index[i]];
 
-		// 递归调用负极大值搜索。
+		// 递归
 		int result = -negativeMaxSearch(cur.state, depth + 1, -beta, -new_alpha, 1 - role);
 
 		if (result > score) {
-			// 记录最好走法
 			bestChoice = cur.choice;
 			score = result;
 		}
 
-		// beta剪枝 (其实在奇数步相当于alpha剪枝)
+		// beta剪枝
 		if (score >= beta) {
 			break;
 		}
 
-		// 记录最高分，更新最优步数
+		// 更新最高分
 		if (score > new_alpha) {
 			new_alpha = score;
 		}
@@ -561,8 +558,6 @@ int Ai::negativeMaxSearch(const State &curState, int depth, int alpha, int beta,
 	}
 	*/
 
-
-	// 如果在第一层，还要保存下最好走法
 	if (depth == 1) {
 		Ai::bestChoice = bestChoice;
 	}
