@@ -99,6 +99,8 @@ namespace Sample
 
 		// 判断当前位置是否合法
 		bool isValid(int x = -1, int y = -1, int o = -1);
+        
+        bool isValid(const State &curState, int x, int y, int o);
 
 		// 判断是否落地
 		bool onGround();
@@ -147,7 +149,7 @@ struct Int256
 	Int256() :data{ 0,0,0,0 } {}
 };
 
-template<class T>struct std::hash;
+//template<class T>struct std::hash;
 // 20*10 + 7*2 + 3 = 217 bits in total
 
 bool operator== (const State &a, const State &b);
@@ -206,3 +208,5 @@ struct Ai
 	};
 
 };
+
+void GenerateAllPossibleMove(const State &curState, Ai::StateInfo *info, int &totInfo);
