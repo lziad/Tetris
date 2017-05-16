@@ -753,6 +753,127 @@ namespace std
 	}
 }
 
+// 去掉了没用的参数检查
+inline bool Sample::Tetris::isValid(const State &curState, int x, int y, int o)
+{
+    int i, tmpX, tmpY;
+    for (i = 0; i < 4; i++)
+    {
+        tmpX = x + shape[o][2 * i];
+        tmpY = y + shape[o][2 * i + 1];
+        if (tmpX < 1 || tmpX > MAPWIDTH ||
+            tmpY < 1 || tmpY > MAPHEIGHT ||
+            curState.grids[tmpY][tmpX] != 0)
+            return false;
+    }
+    return true;
+}
+
+void GenerateAllPossibleMove(const State &curState, Ai::StateInfo *info, int &totInfo) {
+    // totInfo = 0;
+
+    int type = curState.nextType;
+    for (int x = 1; x <= MAPWIDTH; ++x) {
+        for (int y = MAPWIDTH; y >= 1; --y) {
+            int can[MAPWIDTH + 1] = { 0 };
+            Sample::Tetris t(type, 0);
+
+            // 枚举出最顶上那行所有可能的姿态和位置
+            for (int i = 1; i <= MAPWIDTH; ++i) {
+                for (int k = 0; k < 4; ++k) {
+                    if (t.isValid(curState, i, MAPHEIGHT - 1, k)) {
+                        can[i] |= (1 << k);
+                    }
+                }
+            }
+
+            // 往下降一格，每个方块原地转转看看行不行，再往左看看行不行，再原地转转看看行不行
+            for (int j = MAPHEIGHT - 1; j > y; --j) {
+                for (int i = 1; i <= MAPWIDTH; ++i) {
+                    // 原地转；can[i] == 15就是哪个方向都行，就不用转了
+                    for (int k = 0; k < 4 && can[i] != 15; ++k) {
+                        if (!(can[i] & (1 << k)))
+                            continue;
+                        int z = (k + 1) & 3;
+                        while (can[i] != 15) {
+                            if (!t.isValid(curState, i, j, z))
+                                break;
+                            can[i] |= (1 << z);
+                            z = (++z) & 3;
+                        }
+                    }
+                    // 往左
+                    for (int k = 0; k < 4; ++k) {
+                        int p = i;
+                        while (--p && !(can[p] & (1 << k))) {
+                            if (t.isValid(curState, p, j, k)) {
+                                can[p] |= (1 << k);
+                                // 再转转
+                                int z = (k + 1) & 3;
+                                while (can[p] != 15) {
+                                    if (!t.isValid(curState, p, j, z))
+                                        break;
+                                    can[p] |= (1 << z);
+                                    z = (++z) & 3;
+                                }
+                            }
+                        }
+                    }
+                }
+                // 掉不下去的就不管了
+                for (int i = 1; i <= MAPWIDTH; ++i) {
+                    for (int k = 0; k < 4; ++k) {
+                        if (!(can[i] & (1 << k)))
+                            continue;
+                        if (!t.isValid(curState, i, j-1, k)) {
+                            can[i] &= ~(1 << k);
+                        }
+                    }
+                }
+            }
+
+            for (int o = 0; o < 4; ++o) {
+                if (y > 1 && t.isValid(curState, x, y-1, o)) continue;
+                if (!t.isValid(curState, x, y, o)) continue;
+                if (can[x] & (1 << o)) {
+                    info[totInfo].state = curState;
+                    // set
+                    int i, tmpX, tmpY;
+                    for (i = 0; i < 4; i++) {
+                        tmpX = x + blockShape[type][o][2 * i];
+                        tmpY = y + blockShape[type][o][2 * i + 1];
+                        info[totInfo].state.grids[tmpY][tmpX] = true;
+                    }
+
+                    info[totInfo++] = Ai::StateInfo();
+                    info[totInfo].choice = Block(x, y, o);
+                    info[totInfo].id = totInfo;
+                    
+                    // cal score
+
+                    int height = 0;
+                    int fullLines = 0;
+
+                    for (int y = 1; y <= MAPWIDTH; ++y) {
+                        bool isFull = true;
+                        for (int x = 1; x <= MAPWIDTH; ++x) {
+                            if (info[totInfo].state.grids[y][x]) {
+                                height = y;
+                            } else {
+                                isFull = false;
+                            }
+                        }
+                        if (isFull) ++fullLines;
+                    }
+                    
+                    info[totInfo].score = (MAPHEIGHT - height) * 100 + fullLines * 150;
+                }
+            }
+
+        }
+    }
+}
+
 
 int main()
 {
