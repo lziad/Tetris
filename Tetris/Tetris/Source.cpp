@@ -358,10 +358,17 @@ int programInit()
 #ifdef _BOTZONE_ONLINE
 	MODE = 0;
 #else
+
+#ifndef DefaultMode
 	cout << "Local: Please enter test mode: ";
 	cin >> MODE;
 	if (cin.fail())
 		exit(0);
+#else
+	MODE = DefaultMode;
+#endif // !DefaultMode
+
+
 #endif // _BOTZONE_ONLINE
 
 	return 0;
@@ -504,7 +511,8 @@ int AI::negativeMaxSearch(const State &curState, int depth, int alpha, int beta,
 	//!!
 	// 搜索深度达到 DEPTH + 1 ，已经胜利(改成不能放），则返回
 	score = evaluate(curState, role);
-	if (depth == DEPTH + 1 || depth > 1 && abs(score) > WIN_SCORE) {
+	//!!! == must be changed
+	if (depth == DEPTH + 1 || depth > 1 && abs(score) == LostValue) {
 		// 不同深度是否需要不同结果？
 		mp.insert({ curState, score });
 		return score;
@@ -859,6 +867,16 @@ State::operator Int256()const
 	}
 	ret.data[3] += nextType << 30;
 	return ret;
+}
+
+void State::init()
+{
+	for (int i = 0; i < MAPHEIGHT; i++)
+		for (int j = 0; j < MAPWIDTH; j++)
+			grids[i][j] = 0;
+	for (int i = 0; i < 7; i++)
+		typeCount[i] = 0;
+	nextType = 0;	//模拟 玄学系统
 }
 
 namespace std

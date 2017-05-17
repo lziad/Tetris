@@ -20,9 +20,10 @@
 #define MAPWIDTH 10
 #define INF 999999999 //TODO modify max scores
 #define DEPTH 4
-#define WIN_SCORE 999999999
+#define LostValue -1000
 #define ULL unsigned long long
 #define sleep(ms) std::this_thread::sleep_for(std::chrono::milliseconds(ms))
+#define DefaultMode 2
 
 using namespace std;
 using namespace std::placeholders;
@@ -165,6 +166,7 @@ struct State
 	State(const int(&_grid)[MAPHEIGHT][MAPWIDTH],
 		const int(&_typeCount)[7], const int nextType);
 	operator Int256()const;
+	void init();
 
 };
 
