@@ -99,8 +99,8 @@ namespace Sample
 
 		// 判断当前位置是否合法
 		bool isValid(int x = -1, int y = -1, int o = -1);
-        
-        bool isValid(const State &curState, int x, int y, int o);
+
+		bool isValid(const State &curState, int x, int y, int o);
 
 		// 判断是否落地
 		bool onGround();
@@ -141,8 +141,6 @@ int evaluate(const State &state, int role);
 
 void printField(const int(&gridInfo)[2][MAPHEIGHT + 2][MAPWIDTH + 2], int delayMs = 0, bool clean = true);
 
-
-
 struct Int256
 {
 	ULL data[4];
@@ -182,7 +180,7 @@ namespace std
 	};
 }
 
-struct Ai
+struct AI
 {
 	unordered_map<State, int> mp;
 
@@ -190,7 +188,7 @@ struct Ai
 
 	void GenerateStrategy(const State(&states)[2]);
 
-	int negativeMaxSearch(const State(&states), int depth, int alpha, int beta, int role);
+	int negativeMaxSearch(const State &curState, int depth, int alpha, int beta, int role);
 
 	struct StateInfo
 	{
@@ -207,6 +205,8 @@ struct Ai
 		bool operator()(const int a, const int b)const;
 	};
 
+	void GenerateAllPossibleMove(const State &curState, StateInfo *info, int &totInfo, int role);
+
+
 };
 
-void GenerateAllPossibleMove(const State &curState, Ai::StateInfo *info, int &totInfo);

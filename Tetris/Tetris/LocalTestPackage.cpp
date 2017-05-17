@@ -2,6 +2,8 @@
 
 #define PrintFieldDelay 500
 
+using std::cout;
+
 int interpretSeverLog(Json::Value & orig)
 {
 	if (orig["log"].type() == Json::nullValue)
@@ -30,24 +32,28 @@ int interpretSeverLog(Json::Value & orig)
 int gameEngineWork()
 {
 	// init
-	int nextType[2] = { 0 };
-	int typeCount[2][7] = { 0 };
+	State curState[2];
+	//int nextType[2] = { 0 };
+	//int typeCount[2][7] = { 0 };
 	int loser = -1;
 	stateInit(Sample::gridInfo);
 	printField(Sample::gridInfo);
 
+	auto ais = new AI[2];
+
 	// Game start
 	while (true) {
 		// 决策、放方块，检测是否有人挂了
-		Sample::sampleStrategy(Sample::gridInfo, typeCount, nextType[0], 1, -INF, INF, 0);
+		ais[0].negativeMaxSearch(curState[0], 4, -INF, INF, 0);
+		ais[0].negativeMaxSearch(curState[1], 4, -INF, INF, 1);
 		int tmp = blockForEnemy;
-		if (!setAndJudge(nextType[0], 0)) {
+		if (!setAndJudge(curState[0].nextType, 0)) {
 			cout << "Player 0 lose!" << endl;
 			break;
 		}
-
-		Sample::sampleStrategy(Sample::gridInfo, typeCount, nextType[1], 1, -INF, INF, 1);
-		if (!setAndJudge(nextType[1], 1)) {
+		ais[1].negativeMaxSearch(curState[0], 4, -INF, INF, 1);
+		ais[1].negativeMaxSearch(curState[1], 4, -INF, INF, 0);
+		if (!setAndJudge(curState[1].nextType, 1)) {
 			cout << "Player 1 lose!" << endl;
 			break;
 		}
@@ -55,8 +61,8 @@ int gameEngineWork()
 		// 每回合输出一次
 		printField(Sample::gridInfo, PrintFieldDelay);
 
-		nextType[0] = blockForEnemy;
-		nextType[1] = tmp;
+		curState[0].nextType= blockForEnemy;
+		curState[1].nextType= tmp;
 
 		// 检查消去
 		Sample::eliminate(0);

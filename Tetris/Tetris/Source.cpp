@@ -341,7 +341,6 @@ namespace Sample
 			blockForEnemy = rand() % 7;
 		}
 
-
 		return 0;
 	}
 
@@ -488,12 +487,13 @@ int recoverState(int(&grids)[2][MAPHEIGHT + 2][MAPWIDTH + 2],
 	return 0;
 }
 
-void Ai::GenerateStrategy(const State(&states)[2])
+void AI::GenerateStrategy(const State(&states)[2])
 {
 
 }
 
-int Ai::negativeMaxSearch(const State &curState, int depth, int alpha, int beta, int role)
+//role: 0, in my field; 1, in op's field
+int AI::negativeMaxSearch(const State &curState, int depth, int alpha, int beta, int role)
 {
 	int score;
 
@@ -510,24 +510,14 @@ int Ai::negativeMaxSearch(const State &curState, int depth, int alpha, int beta,
 		return score;
 	}
 
-
 	int totInfo = 0;
 	StateInfo info[180];
 	int index[180];
 	// 产生所有的走法
-	//GenerateAllPossibleMove(curState, info, totInfo);
+	GenerateAllPossibleMove(curState, info, totInfo, role);
 	for (int i = 0; i < totInfo; i++)index[i] = i;
 
-	/*
-	// 计算每一步的历史启发得分并排序
-	BoardScore board_score_list[BOARDSIZE * BOARDSIZE];
-	for (int i = 0; i < totInfo; ++i)
-	{
-	board_score_list[i].index = i;
-	board_score_list[i].score =
-	search_move_engine->history_score[states[i].last_move.x][states[i].last_move.y];
-	}
-	*/
+	//x1
 
 	sort(index, index + totInfo, IndexCmp(info));
 
@@ -559,15 +549,10 @@ int Ai::negativeMaxSearch(const State &curState, int depth, int alpha, int beta,
 		}
 	}
 
-	/*
-	// 更新历史得分数组
-	if (bestChoice.x != -1) {
-	search_move_engine->history_score[bestChoice.x][bestChoice.y] += (1 << (DEPTH - depth));
-	}
-	*/
+	//x2
 
 	if (depth == 1) {
-		Ai::bestChoice = bestChoice;
+		AI::bestChoice = bestChoice;
 	}
 
 	// hash
@@ -576,7 +561,142 @@ int Ai::negativeMaxSearch(const State &curState, int depth, int alpha, int beta,
 	return score;
 }
 
-bool Ai::IndexCmp::operator ()(const int a, const int b)const
+void AI::GenerateAllPossibleMove(const State &curState, StateInfo *info, int &totInfo, int role)
+{
+	totInfo = 0;
+
+	if (role == 1)
+	{
+		int containZero = 0;
+		for (int i = 0; i < 7; i++)
+		{
+			if (curState.typeCount[i] == 0)
+			{
+				containZero = 1;
+				break;
+			}
+		}
+
+		for (int i = 0; i < 7; i++)
+		{
+			if (curState.typeCount[i] < 2 || curState.typeCount[i] == 2 && !containZero)
+			{
+				info[totInfo].state = curState;
+				info[totInfo].state.nextType = i;
+				//abnormal use of o
+				info[totInfo].choice.o = i;
+				totInfo++;
+			}
+		}
+
+		return;
+	}
+
+
+	int type = curState.nextType;
+	for (int x = 1; x <= MAPWIDTH; ++x) {
+		for (int y = MAPWIDTH; y >= 1; --y) {
+			int can[MAPWIDTH + 1] = { 0 };
+			Sample::Tetris t(type, 0);
+
+			// 枚举出最顶上那行所有可能的姿态和位置
+			for (int i = 1; i <= MAPWIDTH; ++i) {
+				for (int k = 0; k < 4; ++k) {
+					if (t.isValid(curState, i, MAPHEIGHT - 1, k)) {
+						can[i] |= (1 << k);
+					}
+				}
+			}
+
+			// 往下降一格，每个方块原地转转看看行不行，再往左看看行不行，再原地转转看看行不行
+			for (int j = MAPHEIGHT - 1; j > y; --j) {
+				for (int i = 1; i <= MAPWIDTH; ++i) {
+					// 原地转；can[i] == 15就是哪个方向都行，就不用转了
+					for (int k = 0; k < 4 && can[i] != 15; ++k) {
+						if (!(can[i] & (1 << k)))
+							continue;
+						int z = (k + 1) & 3;
+						while (can[i] != 15) {
+							if (!t.isValid(curState, i, j, z))
+								break;
+							can[i] |= (1 << z);
+							z = (++z) & 3;
+						}
+					}
+					// 往左
+					for (int k = 0; k < 4; ++k) {
+						int p = i;
+						while (--p && !(can[p] & (1 << k))) {
+							if (t.isValid(curState, p, j, k)) {
+								can[p] |= (1 << k);
+								// 再转转
+								int z = (k + 1) & 3;
+								while (can[p] != 15) {
+									if (!t.isValid(curState, p, j, z))
+										break;
+									can[p] |= (1 << z);
+									z = (++z) & 3;
+								}
+							}
+						}
+					}
+				}
+				// 掉不下去的就不管了
+				for (int i = 1; i <= MAPWIDTH; ++i) {
+					for (int k = 0; k < 4; ++k) {
+						if (!(can[i] & (1 << k)))
+							continue;
+						if (!t.isValid(curState, i, j - 1, k)) {
+							can[i] &= ~(1 << k);
+						}
+					}
+				}
+			}
+
+			for (int o = 0; o < 4; ++o) {
+				if (y > 1 && t.isValid(curState, x, y - 1, o)) continue;
+				if (!t.isValid(curState, x, y, o)) continue;
+				if (can[x] & (1 << o)) {
+					info[totInfo].state = curState;
+					// set
+					int i, tmpX, tmpY;
+					for (i = 0; i < 4; i++) {
+						tmpX = x + blockShape[type][o][2 * i];
+						tmpY = y + blockShape[type][o][2 * i + 1];
+						info[totInfo].state.grids[tmpY][tmpX] = true;
+					}
+
+					info[totInfo++] = AI::StateInfo();
+					info[totInfo].choice = Block(x, y, o);
+					info[totInfo].id = totInfo;
+
+					// cal score
+
+					int height = 0;
+					int fullLines = 0;
+
+					for (int y = 1; y <= MAPWIDTH; ++y) {
+						bool isFull = true;
+						for (int x = 1; x <= MAPWIDTH; ++x) {
+							if (info[totInfo].state.grids[y][x]) {
+								height = y;
+							}
+							else {
+								isFull = false;
+							}
+						}
+						if (isFull) ++fullLines;
+					}
+
+					info[totInfo].score = (MAPHEIGHT - height) * 100 + fullLines * 150;
+				}
+			}
+
+		}
+	}
+}
+
+bool AI::IndexCmp::operator ()(const int a, const int b)const
 {
 	return info[a].score - info[b].score;
 }
@@ -756,149 +876,60 @@ namespace std
 // 去掉了没用的参数检查
 inline bool Sample::Tetris::isValid(const State &curState, int x, int y, int o)
 {
-    int i, tmpX, tmpY;
-    for (i = 0; i < 4; i++)
-    {
-        tmpX = x + shape[o][2 * i];
-        tmpY = y + shape[o][2 * i + 1];
-        if (tmpX < 1 || tmpX > MAPWIDTH ||
-            tmpY < 1 || tmpY > MAPHEIGHT ||
-            curState.grids[tmpY][tmpX] != 0)
-            return false;
-    }
-    return true;
+	int i, tmpX, tmpY;
+	for (i = 0; i < 4; i++)
+	{
+		tmpX = x + shape[o][2 * i];
+		tmpY = y + shape[o][2 * i + 1];
+		if (tmpX < 1 || tmpX > MAPWIDTH ||
+			tmpY < 1 || tmpY > MAPHEIGHT ||
+			curState.grids[tmpY][tmpX] != 0)
+			return false;
+	}
+	return true;
 }
-
-void GenerateAllPossibleMove(const State &curState, Ai::StateInfo *info, int &totInfo) {
-    // totInfo = 0;
-
-    int type = curState.nextType;
-    for (int x = 1; x <= MAPWIDTH; ++x) {
-        for (int y = MAPWIDTH; y >= 1; --y) {
-            int can[MAPWIDTH + 1] = { 0 };
-            Sample::Tetris t(type, 0);
-
-            // 枚举出最顶上那行所有可能的姿态和位置
-            for (int i = 1; i <= MAPWIDTH; ++i) {
-                for (int k = 0; k < 4; ++k) {
-                    if (t.isValid(curState, i, MAPHEIGHT - 1, k)) {
-                        can[i] |= (1 << k);
-                    }
-                }
-            }
-
-            // 往下降一格，每个方块原地转转看看行不行，再往左看看行不行，再原地转转看看行不行
-            for (int j = MAPHEIGHT - 1; j > y; --j) {
-                for (int i = 1; i <= MAPWIDTH; ++i) {
-                    // 原地转；can[i] == 15就是哪个方向都行，就不用转了
-                    for (int k = 0; k < 4 && can[i] != 15; ++k) {
-                        if (!(can[i] & (1 << k)))
-                            continue;
-                        int z = (k + 1) & 3;
-                        while (can[i] != 15) {
-                            if (!t.isValid(curState, i, j, z))
-                                break;
-                            can[i] |= (1 << z);
-                            z = (++z) & 3;
-                        }
-                    }
-                    // 往左
-                    for (int k = 0; k < 4; ++k) {
-                        int p = i;
-                        while (--p && !(can[p] & (1 << k))) {
-                            if (t.isValid(curState, p, j, k)) {
-                                can[p] |= (1 << k);
-                                // 再转转
-                                int z = (k + 1) & 3;
-                                while (can[p] != 15) {
-                                    if (!t.isValid(curState, p, j, z))
-                                        break;
-                                    can[p] |= (1 << z);
-                                    z = (++z) & 3;
-                                }
-                            }
-                        }
-                    }
-                }
-                // 掉不下去的就不管了
-                for (int i = 1; i <= MAPWIDTH; ++i) {
-                    for (int k = 0; k < 4; ++k) {
-                        if (!(can[i] & (1 << k)))
-                            continue;
-                        if (!t.isValid(curState, i, j-1, k)) {
-                            can[i] &= ~(1 << k);
-                        }
-                    }
-                }
-            }
-
-            for (int o = 0; o < 4; ++o) {
-                if (y > 1 && t.isValid(curState, x, y-1, o)) continue;
-                if (!t.isValid(curState, x, y, o)) continue;
-                if (can[x] & (1 << o)) {
-                    info[totInfo].state = curState;
-                    // set
-                    int i, tmpX, tmpY;
-                    for (i = 0; i < 4; i++) {
-                        tmpX = x + blockShape[type][o][2 * i];
-                        tmpY = y + blockShape[type][o][2 * i + 1];
-                        info[totInfo].state.grids[tmpY][tmpX] = true;
-                    }
-
-                    info[totInfo++] = Ai::StateInfo();
-                    info[totInfo].choice = Block(x, y, o);
-                    info[totInfo].id = totInfo;
-                    
-                    // cal score
-
-                    int height = 0;
-                    int fullLines = 0;
-
-                    for (int y = 1; y <= MAPWIDTH; ++y) {
-                        bool isFull = true;
-                        for (int x = 1; x <= MAPWIDTH; ++x) {
-                            if (info[totInfo].state.grids[y][x]) {
-                                height = y;
-                            } else {
-                                isFull = false;
-                            }
-                        }
-                        if (isFull) ++fullLines;
-                    }
-                    
-                    info[totInfo].score = (MAPHEIGHT - height) * 100 + fullLines * 150;
-                }
-            }
-
-        }
-    }
-}
-
 
 int main()
 {
 	// 0为红，1为蓝
 	int myColor;
+
+	State curState[2];
+
 	int nextType[2];
 	// 给对应玩家的各类块的数目总计
 	int typeCount[2][7] = { 0 };
 	// 先y后x，记录地图状态，0为空，1为以前放置，2为刚刚放置，负数为越界
 	int curGrid[2][MAPHEIGHT + 2][MAPWIDTH + 2] = { 0 };
 
+
+
 	programInit();
 
 	stateInit(curGrid);
-
 
 	if (MODE == 0 || MODE == 1)
 	{
 		recoverState(curGrid, nextType, typeCount, myColor);
 
+		for (int i = 0; i < 2; i++)
+		{
+			curState[i].nextType = nextType[i];
+			memcpy(curState[i].typeCount, typeCount[i], sizeof(typeCount[i]));
+			for (int r = 0; r < MAPHEIGHT; r++)
+				for (int c = 0; c < MAPWIDTH; c++)
+					curState[i].grids[r][c] = curGrid[i][r + 1][c + 1];
+
+		}
+
 #ifndef _BOTZONE_ONLINE
 		printField(curGrid);
 #endif // _BOTZONE_ONLINE
 
-		Sample::sampleStrategy(curGrid, typeCount, nextType[myColor], 1, -INF, INF, 0);
+		auto ai = new AI();
+
+		ai->negativeMaxSearch(curState[0], 4, -INF, INF, 0);
+		ai->negativeMaxSearch(curState[1], 4, -INF, INF, 1);
 
 		outputResult(blockForEnemy, result);
 	}
