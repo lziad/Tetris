@@ -602,13 +602,13 @@ void AI::GenerateAllPossibleMove(const State &curState, StateInfo *info, int &to
 
 
 	int type = curState.nextType;
-	for (int x = 1; x <= MAPWIDTH; ++x) {
-		for (int y = MAPWIDTH; y >= 1; --y) {
+	for (int x = 0; x < MAPWIDTH; ++x) {
+		for (int y = MAPWIDTH-1; y >= 0; --y) {
 			int can[MAPWIDTH + 1] = { 0 };
 			Sample::Tetris t(type, 0);
 
 			// 枚举出最顶上那行所有可能的姿态和位置
-			for (int i = 1; i <= MAPWIDTH; ++i) {
+			for (int i = 0; i < MAPWIDTH; ++i) {
 				for (int k = 0; k < 4; ++k) {
 					if (t.isValid(curState, i, MAPHEIGHT - 1, k)) {
 						can[i] |= (1 << k);
@@ -617,8 +617,8 @@ void AI::GenerateAllPossibleMove(const State &curState, StateInfo *info, int &to
 			}
 
 			// 往下降一格，每个方块原地转转看看行不行，再往左看看行不行，再原地转转看看行不行
-			for (int j = MAPHEIGHT - 1; j > y; --j) {
-				for (int i = 1; i <= MAPWIDTH; ++i) {
+			for (int j = MAPHEIGHT - 2; j > y; --j) {
+				for (int i = 0; i < MAPWIDTH; ++i) {
 					// 原地转；can[i] == 15就是哪个方向都行，就不用转了
 					for (int k = 0; k < 4 && can[i] != 15; ++k) {
 						if (!(can[i] & (1 << k)))
@@ -650,7 +650,7 @@ void AI::GenerateAllPossibleMove(const State &curState, StateInfo *info, int &to
 					}
 				}
 				// 掉不下去的就不管了
-				for (int i = 1; i <= MAPWIDTH; ++i) {
+				for (int i = 0; i < MAPWIDTH; ++i) {
 					for (int k = 0; k < 4; ++k) {
 						if (!(can[i] & (1 << k)))
 							continue;
@@ -662,9 +662,10 @@ void AI::GenerateAllPossibleMove(const State &curState, StateInfo *info, int &to
 			}
 
 			for (int o = 0; o < 4; ++o) {
-				if (y > 1 && t.isValid(curState, x, y - 1, o)) continue;
+				if (y > 0 && t.isValid(curState, x, y - 1, o)) continue;
 				if (!t.isValid(curState, x, y, o)) continue;
-				if (can[x] & (1 << o)) {
+                if (can[x] & (1 << o)) {
+                    info[totInfo] = AI::StateInfo();
 					info[totInfo].state = curState;
 					// set
 					int i, tmpX, tmpY;
@@ -674,7 +675,6 @@ void AI::GenerateAllPossibleMove(const State &curState, StateInfo *info, int &to
 						info[totInfo].state.grids[tmpY][tmpX] = true;
 					}
 
-					info[totInfo++] = AI::StateInfo();
 					info[totInfo].choice = Block(x, y, o);
 					info[totInfo].id = totInfo;
 
@@ -688,8 +688,7 @@ void AI::GenerateAllPossibleMove(const State &curState, StateInfo *info, int &to
 						for (int x = 1; x <= MAPWIDTH; ++x) {
 							if (info[totInfo].state.grids[y][x]) {
 								height = y;
-							}
-							else {
+							} else {
 								isFull = false;
 							}
 						}
@@ -697,6 +696,9 @@ void AI::GenerateAllPossibleMove(const State &curState, StateInfo *info, int &to
 					}
 
 					info[totInfo].score = (MAPHEIGHT - height) * 100 + fullLines * 150;
+                    ++(info[totInfo].state.typeCount[type]);
+
+                    ++totInfo;
 				}
 			}
 
@@ -899,8 +901,8 @@ inline bool Sample::Tetris::isValid(const State &curState, int x, int y, int o)
 	{
 		tmpX = x + shape[o][2 * i];
 		tmpY = y + shape[o][2 * i + 1];
-		if (tmpX < 1 || tmpX > MAPWIDTH ||
-			tmpY < 1 || tmpY > MAPHEIGHT ||
+		if (tmpX < 0 || tmpX >= MAPWIDTH ||
+			tmpY < 0 || tmpY >= MAPHEIGHT ||
 			curState.grids[tmpY][tmpX] != 0)
 			return false;
 	}
