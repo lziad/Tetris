@@ -58,7 +58,6 @@ bool operator==(const State &a, const State &b)
 	return true;
 }
 
-
 namespace Sample
 {
 	/* 先y后x，记录地图状态，0为空，1为以前放置，2为刚刚放置，负数为越界	  */
@@ -510,7 +509,7 @@ int AI::negativeMaxSearch(const State &curState, int depth, int alpha, int beta,
 
 	//!!
 	// 搜索深度达到 DEPTH + 1 ，已经胜利(改成不能放），则返回
-    score = evaluate(curState, role);
+	score = evaluate(curState, role);
 	//!!! == must be changed
 	if (depth == DEPTH + 1/* || depth > 1 && abs(score) == LostValue*/) {
 		// 不同深度是否需要不同结果？
@@ -522,7 +521,7 @@ int AI::negativeMaxSearch(const State &curState, int depth, int alpha, int beta,
 	StateInfo info[180];
 	int index[180];
 	// 产生所有的走法
-    GenerateAllPossibleMove(curState, info, totInfo, role);
+	GenerateAllPossibleMove(curState, info, totInfo, role);
 	for (int i = 0; i < totInfo; i++)index[i] = i;
 
 	//x1
@@ -593,6 +592,7 @@ void AI::GenerateAllPossibleMove(const State &curState, StateInfo *info, int &to
 				info[totInfo].state.nextType = i;
 				//abnormal use of o
 				info[totInfo].choice.o = i;
+				++(info[totInfo].state.typeCount[i]);
 				totInfo++;
 			}
 		}
@@ -603,7 +603,7 @@ void AI::GenerateAllPossibleMove(const State &curState, StateInfo *info, int &to
 
 	int type = curState.nextType;
 	for (int x = 0; x < MAPWIDTH; ++x) {
-		for (int y = MAPWIDTH-1; y >= 0; --y) {
+		for (int y = MAPWIDTH - 1; y >= 0; --y) {
 			int can[MAPWIDTH + 1] = { 0 };
 			Sample::Tetris t(type, 0);
 
@@ -634,7 +634,7 @@ void AI::GenerateAllPossibleMove(const State &curState, StateInfo *info, int &to
 					// 往左
 					for (int k = 0; k < 4; ++k) {
 						int p = i;
-						while (--p && !(can[p] & (1 << k))) {
+						while (--p >= 0 && !(can[p] & (1 << k))) {
 							if (t.isValid(curState, p, j, k)) {
 								can[p] |= (1 << k);
 								// 再转转
@@ -664,8 +664,8 @@ void AI::GenerateAllPossibleMove(const State &curState, StateInfo *info, int &to
 			for (int o = 0; o < 4; ++o) {
 				if (y > 0 && t.isValid(curState, x, y - 1, o)) continue;
 				if (!t.isValid(curState, x, y, o)) continue;
-                if (can[x] & (1 << o)) {
-                    info[totInfo] = AI::StateInfo();
+				if (can[x] & (1 << o)) {
+					info[totInfo] = AI::StateInfo();
 					info[totInfo].state = curState;
 					// set
 					int tmpX, tmpY;
@@ -680,59 +680,62 @@ void AI::GenerateAllPossibleMove(const State &curState, StateInfo *info, int &to
 
 					// cal score
 
-                    int landingHeight = y;
+					int landingHeight = y;
 					int fullLines = 0;
-                    int fullPieces = 0;
-                    int holes = 0;
-                    int wells[MAPWIDTH] = { 0 };
-                    int wellSum = 0;
-                    int rowTrans = 0;
-                    int colTrans = 0;
-                    bool curRowStatus = false;
-                    bool curColStatus[MAPWIDTH] = { 0 };
-                    memcpy(curColStatus, info[totInfo].state.grids[0], sizeof(curColStatus));
+					int fullPieces = 0;
+					int holes = 0;
+					int wells[MAPWIDTH] = { 0 };
+					int wellSum = 0;
+					int rowTrans = 0;
+					int colTrans = 0;
+					bool curRowStatus = false;
+					bool curColStatus[MAPWIDTH] = { 0 };
+					memcpy(curColStatus, info[totInfo].state.grids[0], sizeof(curColStatus));
 
 					for (int j = 0; j < MAPHEIGHT; ++j) {
 						bool isFull = true;
-                        curRowStatus = info[totInfo].state.grids[j][0];
+						curRowStatus = info[totInfo].state.grids[j][0];
 						for (int i = 0; i < MAPWIDTH; ++i) {
 							if (info[totInfo].state.grids[j][i]) {
-                                if (!curRowStatus) ++rowTrans;
-                                if (!curColStatus[i]) ++colTrans;
-							} else {
-                                if (curRowStatus) ++rowTrans;
-                                if (curColStatus[i]) ++colTrans;
-                                if (info[totInfo].state.grids[j+1][i]) ++holes;
-                                if (info[totInfo].state.grids[j][i-1] &&
-                                    info[totInfo].state.grids[j][i+1]) {
-                                    ++wells[i];
-                                } else if (wells[i]) {
-                                    wellSum += (wells[i] * (wells[i] + 1)) / 2;
-                                    wells[i] = 0;
-                                }
+								if (!curRowStatus) ++rowTrans;
+								if (!curColStatus[i]) ++colTrans;
+							}
+							else {
+								if (curRowStatus) ++rowTrans;
+								if (curColStatus[i]) ++colTrans;
+								if (info[totInfo].state.grids[j + 1][i]) ++holes;
+								if (info[totInfo].state.grids[j][i - 1] &&
+									info[totInfo].state.grids[j][i + 1]) {
+									++wells[i];
+								}
+								else if (wells[i]) {
+									wellSum += (wells[i] * (wells[i] + 1)) / 2;
+									wells[i] = 0;
+								}
 								isFull = false;
 							}
-                        }
-                        memcpy(curColStatus, info[totInfo].state.grids[j], sizeof(curColStatus));
-                        if (isFull) {
-                            ++fullLines;
-                            for (int i = 0; i < 4; ++i) {
-                                int tmp = y + blockShape[type][o][2 * i + 1];
-                                if (tmp == j) ++fullPieces;
-                            }
-                        }
+							curRowStatus = info[totInfo].state.grids[j][i];
+						}
+						memcpy(curColStatus, info[totInfo].state.grids[j], sizeof(curColStatus));
+						if (isFull) {
+							++fullLines;
+							for (int i = 0; i < 4; ++i) {
+								int tmp = y + blockShape[type][o][2 * i + 1];
+								if (tmp == j) ++fullPieces;
+							}
+						}
 					}
 
-                    info[totInfo].score =
-                        -4500 * landingHeight +
-                         3418 * fullLines * fullPieces +
-                        -3218 * rowTrans +
-                        -9349 * colTrans +
-                        -7899 * holes +
-                        -3386 * wellSum;
-                    ++(info[totInfo].state.typeCount[type]);
+					info[totInfo].score =
+						-4500 * landingHeight +
+						3418 * fullLines * fullPieces +
+						-3218 * rowTrans +
+						-9349 * colTrans +
+						-7899 * holes +
+						-3386 * wellSum;
+					++(info[totInfo].state.typeCount[type]);
 
-                    ++totInfo;
+					++totInfo;
 				}
 			}
 
@@ -743,6 +746,49 @@ void AI::GenerateAllPossibleMove(const State &curState, StateInfo *info, int &to
 bool AI::IndexCmp::operator ()(const int a, const int b)const
 {
 	return info[a].score > info[b].score;
+}
+
+void AI::GreedySearch(const State &curState, int role)
+{
+	if (role == 1)
+	{
+		// 再看看给对方什么好
+		int maxCount = 0, minCount = 99;
+		for (int i = 0; i < 7; i++)
+		{
+			if (curState.typeCount[i] > maxCount)
+				maxCount = curState.typeCount[i];
+			if (curState.typeCount[i] < minCount)
+				minCount = curState.typeCount[i];
+		}
+		if (maxCount - minCount == 2)
+		{
+			// 危险，找一个不是最大的块给对方吧
+			for (int blockForEnemy = 0; blockForEnemy < 7; blockForEnemy++)
+				if (curState.typeCount[blockForEnemy] != maxCount)
+					break;
+		}
+		else
+		{
+			blockForEnemy = rand() % 7;
+		}
+
+		bestChoice.o = blockForEnemy;
+
+		return;
+
+	}
+	int totInfo = 0;
+	StateInfo info[180];
+	GenerateAllPossibleMove(curState, info, totInfo, role);
+
+	qsort(info, totInfo, sizeof(StateInfo), [](const void *va, const void *vb) {
+		return ((const StateInfo*)va)->score - ((const StateInfo*)vb)->score;
+	});
+	bestChoice = info[0].choice;
+
+
+
 }
 
 void outputResult(const int &blockForEnemy, const Block &result)
@@ -833,52 +879,55 @@ bool canReach(int color, int blockType, int x, int y, int o)
 //!! adjusted gridInfo size
 int evaluate(const State &state, int role)
 {
-    int landingHeight = 0;
-    int fullLines = 0;
-    int holes = 0;
-    int wells[MAPWIDTH] = { 0 };
-    int wellSum = 0;
-    int rowTrans = 0;
-    int colTrans = 0;
-    bool curRowStatus = false;
-    bool curColStatus[MAPWIDTH] = { 0 };
-    memcpy(curColStatus, state.grids[0], sizeof(curColStatus));
-    
-    for (int j = 0; j < MAPHEIGHT; ++j) {
-        bool isFull = true;
-        curRowStatus = state.grids[j][0];
-        for (int i = 0; i < MAPWIDTH; ++i) {
-            if (state.grids[j][i]) {
-                landingHeight = j;
-                if (!curRowStatus) ++rowTrans;
-                if (!curColStatus[i]) ++colTrans;
-            } else {
-                if (curRowStatus) ++rowTrans;
-                if (curColStatus[i]) ++colTrans;
-                if (state.grids[j+1][i]) ++holes;
-                if (state.grids[j][i-1] &&
-                    state.grids[j][i+1]) {
-                    ++wells[i];
-                } else if (wells[i]) {
-                    wellSum += (wells[i] * (wells[i] + 1)) / 2;
-                    wells[i] = 0;
-                }
-                isFull = false;
-            }
-        }
-        memcpy(curColStatus, state.grids[j], sizeof(curColStatus));
-        if (isFull) {
-            ++fullLines;
-        }
-    }
-    
-    return
-    -4500 * landingHeight +
-    3418 * fullLines +
-    -3218 * rowTrans +
-    -9349 * colTrans +
-    -7899 * holes +
-    -3386 * wellSum;
+	int landingHeight = 0;
+	int fullLines = 0;
+	int holes = 0;
+	int wells[MAPWIDTH] = { 0 };
+	int wellSum = 0;
+	int rowTrans = 0;
+	int colTrans = 0;
+	bool curRowStatus = false;
+	bool curColStatus[MAPWIDTH] = { 0 };
+	memcpy(curColStatus, state.grids[0], sizeof(curColStatus));
+
+	for (int j = 0; j < MAPHEIGHT; ++j) {
+		bool isFull = true;
+		curRowStatus = state.grids[j][0];
+		for (int i = 0; i < MAPWIDTH; ++i) {
+			if (state.grids[j][i]) {
+				landingHeight = j;
+				if (!curRowStatus) ++rowTrans;
+				if (!curColStatus[i]) ++colTrans;
+			}
+			else {
+				if (curRowStatus) ++rowTrans;
+				if (curColStatus[i]) ++colTrans;
+				if (state.grids[j + 1][i]) ++holes;
+				if (state.grids[j][i - 1] &&
+					state.grids[j][i + 1]) {
+					++wells[i];
+				}
+				else if (wells[i]) {
+					wellSum += (wells[i] * (wells[i] + 1)) / 2;
+					wells[i] = 0;
+				}
+				isFull = false;
+			}
+			curRowStatus = state.grids[j][i];
+		}
+		memcpy(curColStatus, state.grids[j], sizeof(curColStatus));
+		if (isFull) {
+			++fullLines;
+		}
+	}
+
+	return
+		-4500 * landingHeight +
+		3418 * fullLines +
+		-3218 * rowTrans +
+		-9349 * colTrans +
+		-7899 * holes +
+		-3386 * wellSum;
 }
 
 State::State(const int(&_grid)[MAPHEIGHT][MAPWIDTH],
@@ -998,10 +1047,13 @@ int main()
 
 		auto ai = new AI();
 
-		ai->negativeMaxSearch(curState[0], 1, -INF, INF, 0);
-        if (myColor) result = ai->bestChoice; else blockForEnemy = ai->bestChoice.o;
-		ai->negativeMaxSearch(curState[1], 1, -INF, INF, 1);
-        if (!myColor) result = ai->bestChoice; else blockForEnemy = ai->bestChoice.o;
+		ai->GreedySearch(curState[myColor], 0);
+		//ai->negativeMaxSearch(curState[myColor], 1, -INF, INF, 0);
+		result = ai->bestChoice;
+		++result.x; ++result.y;
+		ai->GreedySearch(curState[1 - myColor], 1);
+		//ai->negativeMaxSearch(curState[1-myColor], 1, -INF, INF, 1);
+		blockForEnemy = ai->bestChoice.o;
 
 		outputResult(blockForEnemy, result);
 	}

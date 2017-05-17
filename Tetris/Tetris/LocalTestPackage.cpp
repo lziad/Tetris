@@ -1,26 +1,25 @@
 ﻿#include "LocalTestPackage.h"
 
-#define PrintFieldDelay 500
 
 using std::cout;
 
 int interpretSeverLog(Json::Value & orig)
 {
-	if (orig["log"].type() == Json::nullValue)
+	if (orig.type() == Json::nullValue)
 		return 1;
 	Json::Value ret;
 	//0 or 1
 	int myTeam;
-	auto dataSize = orig["log"].size() / 2;
+	auto dataSize = orig.size() / 2;
 	cout << "Local: Please enter team id: "; cin >> myTeam;
-	ret["requests"][0] = orig["log"][0]["output"]["content"][to_string(myTeam)];
+	ret["requests"][0] = orig[0]["output"]["content"][to_string(myTeam)];
 	for (auto i = 1u; i <= dataSize; i++)
 	{
-		ret["requests"][i] = orig["log"][2 * i - 1][to_string(1 - myTeam)]["response"];
+		ret["requests"][i] = orig[2 * i - 1][to_string(1 - myTeam)]["response"];
 	}
 	for (auto i = 0u; i < dataSize; i++)
 	{
-		ret["responses"][i] = orig["log"][2 * i + 1][to_string(myTeam)]["response"];
+		ret["responses"][i] = orig[2 * i + 1][to_string(myTeam)]["response"];
 	}
 
 	//Json::FastWriter writer;cout << writer.write(ret);
@@ -38,7 +37,7 @@ int gameEngineWork()
 	//int typeCount[2][7] = { 0 };
 	int loser = -1;
 	stateInit(Sample::gridInfo);
-	printField(Sample::gridInfo);
+	//printField(Sample::gridInfo);
 
 	auto ais = new AI[2];
 
@@ -46,24 +45,34 @@ int gameEngineWork()
 	while (true) {
 		// 决策、放方块，检测是否有人挂了
 		ais[0].negativeMaxSearch(curState[0], 1, -INF, INF, 0);
+		result = ais[0].bestChoice;
+		++result.x; ++result.y;
 		ais[0].negativeMaxSearch(curState[1], 1, -INF, INF, 1);
-		int tmp = blockForEnemy;
+		int tmp = ais[0].bestChoice.o;
+		gridsTransfer(Sample::gridInfo[0], curState[0]);
 		if (!setAndJudge(curState[0].nextType, 0)) {
 			cout << "Player 0 lose!" << endl;
 			break;
 		}
-		ais[1].negativeMaxSearch(curState[0], 1, -INF, INF, 1);
+		gridsTransfer(curState[0], Sample::gridInfo[0]);
+
 		ais[1].negativeMaxSearch(curState[1], 1, -INF, INF, 0);
+		result = ais[1].bestChoice;
+		++result.x; ++result.y;
+		ais[1].negativeMaxSearch(curState[0], 1, -INF, INF, 1);
+		gridsTransfer(Sample::gridInfo[1], curState[1]);
+		blockForEnemy = ais[1].bestChoice.o;
 		if (!setAndJudge(curState[1].nextType, 1)) {
 			cout << "Player 1 lose!" << endl;
 			break;
 		}
+		gridsTransfer(curState[1], Sample::gridInfo[1]);
 
 		// 每回合输出一次
 		printField(Sample::gridInfo, PrintFieldDelay);
 
-		curState[0].nextType= blockForEnemy;
-		curState[1].nextType= tmp;
+		curState[0].nextType = blockForEnemy;
+		curState[1].nextType = tmp;
 
 		// 检查消去
 		Sample::eliminate(0);
@@ -78,7 +87,7 @@ int gameEngineWork()
 	}
 
 	// 终局图
-	printField(Sample::gridInfo, PrintFieldDelay);
+	printField(curState, PrintFieldDelay);
 	// 输出一下分数
 	cout << "Scores: " << Sample::score[0] << " vs " << Sample::score[1] << endl;
 
@@ -112,4 +121,44 @@ void printField(const int(&gridInfo)[2][MAPHEIGHT + 2][MAPWIDTH + 2], int delayM
 	}
 	cout << endl;
 	//cout << "（图例： ~~：墙，[]：块，{}：新块）" << endl << endl;
+}
+
+void printField(const State(&state)[2], int delayMs, bool clean)
+{
+	if (delayMs)
+		sleep(delayMs);
+	if (clean)
+		system("cls");
+
+	static const char *i2s[] = { "~~","~~","  ","[]","{}" };
+
+	cout << endl;
+	for (int y = MAPHEIGHT; y >= 0; y--)
+	{
+		for (int x = 0; x <= MAPWIDTH; x++)
+			cout << i2s[state[0].grids[y][x] + 2];
+		for (int x = 0; x <= MAPWIDTH; x++)
+			cout << i2s[state[1].grids[y][x] + 2];
+		cout << endl;
+	}
+	cout << endl;
+	//cout << "（图例： ~~：墙，[]：块，{}：新块）" << endl << endl;
+}
+
+void gridsTransfer(int(&dst)[MAPHEIGHT + 2][MAPWIDTH + 2], const State &state)
+{
+	for (int i = 0; i < MAPHEIGHT; i++)
+		for (int j = 0; j > MAPWIDTH; j++)
+		{
+			dst[i + 1][j + 1] = state.grids[i][j];
+		}
+}
+
+void gridsTransfer(State &state, const int(&dst)[MAPHEIGHT + 2][MAPWIDTH + 2])
+{
+	for (int i = 0; i < MAPHEIGHT; i++)
+		for (int j = 0; j > MAPWIDTH; j++)
+		{
+			state.grids[i][j] = dst[i + 1][j + 1];
+		}
 }

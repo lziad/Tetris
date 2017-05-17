@@ -23,7 +23,9 @@
 #define LostValue -10000000
 #define ULL unsigned long long
 #define sleep(ms) std::this_thread::sleep_for(std::chrono::milliseconds(ms))
-#define DefaultMode 1
+#define DefaultMode 2
+#define PrintFieldDelay 30
+
 
 using namespace std;
 using namespace std::placeholders;
@@ -142,6 +144,8 @@ int evaluate(const State &state, int role);
 
 void printField(const int(&gridInfo)[2][MAPHEIGHT + 2][MAPWIDTH + 2], int delayMs = 0, bool clean = true);
 
+void printField(const State(&state)[2], int delayMs = 0, bool clean = true);
+
 struct Int256
 {
 	ULL data[4];
@@ -188,10 +192,6 @@ struct AI
 
 	Block bestChoice;
 
-	void GenerateStrategy(const State(&states)[2]);
-
-	int negativeMaxSearch(const State &curState, int depth, int alpha, int beta, int role);
-
 	struct StateInfo
 	{
 		State state;
@@ -207,7 +207,17 @@ struct AI
 		bool operator()(const int a, const int b)const;
 	};
 
+	void GenerateStrategy(const State(&states)[2]);
+
 	void GenerateAllPossibleMove(const State &curState, StateInfo *info, int &totInfo, int role);
 
+	int negativeMaxSearch(const State &curState, int depth, int alpha, int beta, int role);
+
+	void GreedySearch(const State &curState, int role);
+
 };
+
+void gridsTransfer(int(&dst)[MAPHEIGHT + 2][MAPWIDTH + 2], const State &state);
+
+void gridsTransfer(State &state, const int(&dst)[MAPHEIGHT + 2][MAPWIDTH + 2]);
 
