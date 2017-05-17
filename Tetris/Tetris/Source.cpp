@@ -998,9 +998,9 @@ int main()
 
 		auto ai = new AI();
 
-		ai->negativeMaxSearch(curState[0], 0, -INF, INF, 0);
+		ai->negativeMaxSearch(curState[0], 1, -INF, INF, 0);
         if (myColor) result = ai->bestChoice; else blockForEnemy = ai->bestChoice.o;
-		ai->negativeMaxSearch(curState[1], 0, -INF, INF, 1);
+		ai->negativeMaxSearch(curState[1], 1, -INF, INF, 1);
         if (!myColor) result = ai->bestChoice; else blockForEnemy = ai->bestChoice.o;
 
 		outputResult(blockForEnemy, result);
