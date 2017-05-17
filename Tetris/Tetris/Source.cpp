@@ -922,8 +922,6 @@ int main()
 	// 先y后x，记录地图状态，0为空，1为以前放置，2为刚刚放置，负数为越界
 	int curGrid[2][MAPHEIGHT + 2][MAPWIDTH + 2] = { 0 };
 
-
-
 	programInit();
 
 	stateInit(curGrid);
@@ -948,9 +946,10 @@ int main()
 
 		auto ai = new AI();
 
-		ai->negativeMaxSearch(curState[0], 0, -INF, INF, 0);
-		ai->negativeMaxSearch(curState[1], 0, -INF, INF, 1);
-
+		ai->negativeMaxSearch(curState[0], 1, -INF, INF, 0);
+		result = ai->bestChoice;
+		ai->negativeMaxSearch(curState[1], 1, -INF, INF, 1);
+		blockForEnemy = ai->bestChoice.o;
 		outputResult(blockForEnemy, result);
 	}
 #ifndef _BOTZONE_ONLINE
@@ -963,4 +962,5 @@ int main()
 		exit(0);
 
 	return 0;
+
 }

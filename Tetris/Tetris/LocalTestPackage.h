@@ -23,7 +23,7 @@
 #define LostValue -1000
 #define ULL unsigned long long
 #define sleep(ms) std::this_thread::sleep_for(std::chrono::milliseconds(ms))
-#define DefaultMode 2
+#define DefaultMode 1
 
 using namespace std;
 using namespace std::placeholders;
@@ -208,7 +208,6 @@ struct AI
 	};
 
 	void GenerateAllPossibleMove(const State &curState, StateInfo *info, int &totInfo, int role);
-
 
 };
 
