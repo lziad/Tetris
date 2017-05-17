@@ -45,15 +45,15 @@ int gameEngineWork()
 	// Game start
 	while (true) {
 		// 决策、放方块，检测是否有人挂了
-		ais[0].negativeMaxSearch(curState[0], 4, -INF, INF, 0);
-		ais[0].negativeMaxSearch(curState[1], 4, -INF, INF, 1);
+		ais[0].negativeMaxSearch(curState[0], 0, -INF, INF, 0);
+		ais[0].negativeMaxSearch(curState[1], 0, -INF, INF, 1);
 		int tmp = blockForEnemy;
 		if (!setAndJudge(curState[0].nextType, 0)) {
 			cout << "Player 0 lose!" << endl;
 			break;
 		}
-		ais[1].negativeMaxSearch(curState[0], 4, -INF, INF, 1);
-		ais[1].negativeMaxSearch(curState[1], 4, -INF, INF, 0);
+		ais[1].negativeMaxSearch(curState[0], 0, -INF, INF, 1);
+		ais[1].negativeMaxSearch(curState[1], 0, -INF, INF, 0);
 		if (!setAndJudge(curState[1].nextType, 1)) {
 			cout << "Player 1 lose!" << endl;
 			break;

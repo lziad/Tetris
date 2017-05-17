@@ -708,7 +708,7 @@ void AI::GenerateAllPossibleMove(const State &curState, StateInfo *info, int &to
 
 bool AI::IndexCmp::operator ()(const int a, const int b)const
 {
-	return info[a].score - info[b].score;
+	return info[a].score > info[b].score;
 }
 
 void outputResult(const int &blockForEnemy, const Block &result)
@@ -948,8 +948,8 @@ int main()
 
 		auto ai = new AI();
 
-		ai->negativeMaxSearch(curState[0], 4, -INF, INF, 0);
-		ai->negativeMaxSearch(curState[1], 4, -INF, INF, 1);
+		ai->negativeMaxSearch(curState[0], 0, -INF, INF, 0);
+		ai->negativeMaxSearch(curState[1], 0, -INF, INF, 1);
 
 		outputResult(blockForEnemy, result);
 	}
