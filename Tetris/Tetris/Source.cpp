@@ -115,6 +115,12 @@ namespace Sample
 	{
 		if (isValid() && !isValid(-1, block.y - 1))
 			return true;
+        int i, tmpX, tmpY;
+        for (i = 0; i < 4; i++)
+        {
+            tmpX = block.x + shape[block.o][2 * i];
+            tmpY = block.y + shape[block.o][2 * i + 1];
+        }
 		return false;
 	}
 
@@ -562,21 +568,36 @@ void AI::GenerateAllPossibleMove(const State &curState, StateInfo *info, int &to
 		return;
 	}
 
-
-	int type = curState.nextType;
+    int type = curState.nextType;
+    Sample::Tetris t(type, 0);
+    int topcan[MAPWIDTH + 1] = { 0 };
+    int can[MAPWIDTH + 1] = { 0 };
+    
+    // 枚举出最顶上那行所有可能的姿态和位置
+    for (int i = 0; i < MAPWIDTH; ++i) {
+        for (int k = 0; k < 4; ++k) {
+            if (t.isValid(curState, i, MAPHEIGHT - 1, k)) {
+                topcan[i] |= (1 << k);
+            }
+        }
+    }
+    
 	for (int x = 0; x < MAPWIDTH; ++x) {
-		for (int y = MAPWIDTH - 1; y >= 0; --y) {
-			int can[MAPWIDTH + 1] = { 0 };
-			Sample::Tetris t(type, 0);
+		for (int y = MAPHEIGHT - 1; y >= 0; --y) {
 
-			// 枚举出最顶上那行所有可能的姿态和位置
-			for (int i = 0; i < MAPWIDTH; ++i) {
-				for (int k = 0; k < 4; ++k) {
-					if (t.isValid(curState, i, MAPHEIGHT - 1, k)) {
-						can[i] |= (1 << k);
-					}
-				}
-			}
+            memcpy(can, topcan, sizeof can);
+
+            if (y != MAPHEIGHT - 1) {
+                for (int i = 0; i < MAPWIDTH; ++i) {
+                    for (int k = 0; k < 4; ++k) {
+                        if (!(can[i] & (1 << k)))
+                            continue;
+                        if (!t.isValid(curState, i, MAPWIDTH - 2, k)) {
+                            can[i] &= ~(1 << k);
+                        }
+                    }
+                }
+            }
 
 			// 往下降一格，每个方块原地转转看看行不行，再往左看看行不行，再原地转转看看行不行
 			for (int j = MAPHEIGHT - 2; j > y; --j) {
@@ -611,7 +632,8 @@ void AI::GenerateAllPossibleMove(const State &curState, StateInfo *info, int &to
 						}
 					}
 				}
-				// 掉不下去的就不管了
+                // 掉不下去的就不管了
+                // TODO: 全零优化
 				for (int i = 0; i < MAPWIDTH; ++i) {
 					for (int k = 0; k < 4; ++k) {
 						if (!(can[i] & (1 << k)))
@@ -623,9 +645,9 @@ void AI::GenerateAllPossibleMove(const State &curState, StateInfo *info, int &to
 				}
 			}
 
-			for (int o = 0; o < 4; ++o) {
-				if (y > 0 && t.isValid(curState, x, y - 1, o)) continue;
-				if (!t.isValid(curState, x, y, o)) continue;
+            for (int o = 0; o < 4; ++o) {
+                if (!t.isValid(curState, x, y, o)) continue;
+                if (y > 0 && t.isValid(curState, x, y - 1, o)) continue;
 				if (can[x] & (1 << o)) {
 					info[totInfo] = AI::StateInfo();
 					info[totInfo].state = curState;
@@ -785,7 +807,7 @@ void AI::GreedySearch(const State &curState, int role)
 			blockForEnemy = rand() % 7;
 		}
 
-		bestChoice.o = blockForEnemy;
+		//bestChoice.o = blockForEnemy;
 
 		return;
 
@@ -795,7 +817,7 @@ void AI::GreedySearch(const State &curState, int role)
 	GenerateAllPossibleMove(curState, info, totInfo, role);
 
 	qsort(info, totInfo, sizeof(StateInfo), [](const void *va, const void *vb) {
-		return ((const StateInfo*)va)->score - ((const StateInfo*)vb)->score;
+		return ((const StateInfo*)vb)->score - ((const StateInfo*)va)->score;
 	});
 	bestChoice = info[0].choice;
 
@@ -1016,7 +1038,7 @@ inline bool Sample::Tetris::isValid(const State &curState, int x, int y, int o)
 		tmpY = y + shape[o][2 * i + 1];
 		if (tmpX < 0 || tmpX >= MAPWIDTH ||
 			tmpY < 0 || tmpY >= MAPHEIGHT ||
-			curState.grids[tmpY][tmpX] != 0)
+			curState.grids[tmpY][tmpX])
 			return false;
 	}
 	return true;
