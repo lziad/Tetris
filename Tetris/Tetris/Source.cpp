@@ -27,10 +27,6 @@
  /* 2     Host local game		*/
 int MODE;
 
-int blockForEnemy;
-
-Block result;
-
 Block::Block(const int &x, const int &y, const int &o)
 	:x(x), y(y), o(o) {}
 
@@ -44,8 +40,8 @@ Block::Block(const Json::Value& jv)
 Block::operator Json::Value()const
 {
 	Json::Value jv;
-	jv["x"] = x;
-	jv["y"] = y;
+	jv["x"] = x + 1;
+	jv["y"] = y + 1;
 	jv["o"] = o;
 	return jv;
 }
@@ -295,53 +291,6 @@ namespace Sample
 		return false;
 	}
 
-	//样例决策
-	int sampleStrategy(
-		const int(&gridInfo)[2][MAPHEIGHT + 2][MAPWIDTH + 2], int(&typeCount)[2][7],
-		const int nextBlockType, int depth, int alpha, int beta, int role)
-	{
-		memcpy(Sample::gridInfo, gridInfo, sizeof(gridInfo));
-		int myColor = role;
-		/* 贪心决策												*/
-		/* 从下往上以各种姿态找到第一个位置，要求能够直着落下		*/
-		Sample::Tetris block(nextBlockType, myColor);
-		for (int y = 1; y <= MAPHEIGHT; y++)
-			for (int x = 1; x <= MAPWIDTH; x++)
-				for (int o = 0; o < 4; o++)
-				{
-					if (block.set(x, y, o).isValid() &&
-						Sample::checkDirectDropTo(myColor, block.blockType, x, y, o))
-					{
-						result = { x,y,o };
-						goto determined;
-					}
-				}
-
-	determined:
-		// 再看看给对方什么好
-
-		int maxCount = 0, minCount = 99;
-		for (int i = 0; i < 7; i++)
-		{
-			if (typeCount[1 - myColor][i] > maxCount)
-				maxCount = typeCount[1 - myColor][i];
-			if (typeCount[1 - myColor][i] < minCount)
-				minCount = typeCount[1 - myColor][i];
-		}
-		if (maxCount - minCount == 2)
-		{
-			// 危险，找一个不是最大的块给对方吧
-			for (blockForEnemy = 0; blockForEnemy < 7; blockForEnemy++)
-				if (typeCount[1 - myColor][blockForEnemy] != maxCount)
-					break;
-		}
-		else
-		{
-			blockForEnemy = rand() % 7;
-		}
-
-		return 0;
-	}
 
 }
 
@@ -493,9 +442,18 @@ int recoverState(int(&grids)[2][MAPHEIGHT + 2][MAPWIDTH + 2],
 	return 0;
 }
 
-void AI::GenerateStrategy(const State(&states)[2])
+void AI::GenerateStrategy(const State &mine, const State &ops, int level)
 {
-
+	if (level == 2)
+	{
+		negativeMaxSearch(mine, 1, -INF, INF, 0);
+		negativeMaxSearch(ops, 1, -INF, INF, 1);
+	}
+	if (level == 1)
+	{
+		GreedySearch(mine, 0);
+		GreedySearch(ops, 1);
+	}
 }
 
 //role: 0, in my field; 1, in op's field
@@ -559,7 +517,11 @@ int AI::negativeMaxSearch(const State &curState, int depth, int alpha, int beta,
 	//x2
 
 	if (depth == 1) {
-		AI::bestChoice = bestChoice;
+		if (role == 0)
+			AI::bestChoice = bestChoice;
+		else
+			AI::blockForEnemy = bestChoice.o;
+
 	}
 
 	// hash
@@ -742,6 +704,56 @@ void AI::GenerateAllPossibleMove(const State &curState, StateInfo *info, int &to
 		}
 	}
 }
+
+//样例决策
+int AI::sampleStrategy(
+	const int(&gridInfo)[2][MAPHEIGHT + 2][MAPWIDTH + 2], int(&typeCount)[2][7],
+	const int nextBlockType, int depth, int alpha, int beta, int role)
+{
+	memcpy(Sample::gridInfo, gridInfo, sizeof(gridInfo));
+	int myColor = role;
+	/* 贪心决策												*/
+	/* 从下往上以各种姿态找到第一个位置，要求能够直着落下		*/
+	Sample::Tetris block(nextBlockType, myColor);
+	for (int y = 1; y <= MAPHEIGHT; y++)
+		for (int x = 1; x <= MAPWIDTH; x++)
+			for (int o = 0; o < 4; o++)
+			{
+				if (block.set(x, y, o).isValid() &&
+					Sample::checkDirectDropTo(myColor, block.blockType, x, y, o))
+				{
+					bestChoice = { x,y,o };
+					goto determined;
+				}
+			}
+
+determined:
+	// 再看看给对方什么好
+
+	int maxCount = 0, minCount = 99;
+	for (int i = 0; i < 7; i++)
+	{
+		if (typeCount[1 - myColor][i] > maxCount)
+			maxCount = typeCount[1 - myColor][i];
+		if (typeCount[1 - myColor][i] < minCount)
+			minCount = typeCount[1 - myColor][i];
+	}
+	if (maxCount - minCount == 2)
+	{
+		// 危险，找一个不是最大的块给对方吧
+		for (blockForEnemy = 0; blockForEnemy < 7; blockForEnemy++)
+			if (typeCount[1 - myColor][blockForEnemy] != maxCount)
+				break;
+	}
+	else
+	{
+		blockForEnemy = rand() % 7;
+	}
+
+	return 0;
+}
+
+
 
 bool AI::IndexCmp::operator ()(const int a, const int b)const
 {
@@ -930,6 +942,8 @@ int evaluate(const State &state, int role)
 		-3386 * wellSum;
 }
 
+State::State() {};
+
 State::State(const int(&_grid)[MAPHEIGHT][MAPWIDTH],
 	const int(&_typeCount)[7], const int nextType)
 	:nextType(nextType)
@@ -1046,16 +1060,8 @@ int main()
 #endif // _BOTZONE_ONLINE
 
 		auto ai = new AI();
-
-		ai->GreedySearch(curState[myColor], 0);
-		//ai->negativeMaxSearch(curState[myColor], 1, -INF, INF, 0);
-		result = ai->bestChoice;
-		++result.x; ++result.y;
-		ai->GreedySearch(curState[1 - myColor], 1);
-		//ai->negativeMaxSearch(curState[1-myColor], 1, -INF, INF, 1);
-		blockForEnemy = ai->bestChoice.o;
-
-		outputResult(blockForEnemy, result);
+		ai->GenerateStrategy(curState[myColor], curState[1 - myColor], 1);
+		outputResult(ai->blockForEnemy, ai->bestChoice);
 	}
 #ifndef _BOTZONE_ONLINE
 	else if (MODE == 2)

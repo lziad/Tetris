@@ -56,10 +56,6 @@ struct State;
 
 extern int MODE;
 
-extern int blockForEnemy;
-
-extern Block result;
-
 struct Block
 {
 	int x, y, o;
@@ -72,17 +68,16 @@ struct Block
 	operator Json::Value()const;
 };
 
-
 namespace Sample
 {
 	extern int gridInfo[2][MAPHEIGHT + 2][MAPWIDTH + 2];
-
+	 
 	extern int trans[2][4][MAPWIDTH + 2];
-
+	 
 	extern int transCount[2];
-
+	 
 	extern int maxHeight[2];
-
+	 
 	extern int score[2];
 
 	class Tetris
@@ -123,9 +118,6 @@ namespace Sample
 
 	inline bool canContinue(int color, int blockType);
 
-	int sampleStrategy(
-		const int(&gridInfo)[2][MAPHEIGHT + 2][MAPWIDTH + 2], int(&typeCount)[2][7],
-		const int nextBlockType, int depth, int alpha, int beta, int role);
 }
 
 //abstruct input data from server log
@@ -133,8 +125,7 @@ int interpretSeverLog(Json::Value& orig);
 
 void stateInit(int(&grids)[2][MAPHEIGHT + 2][MAPWIDTH + 2]);
 
-
-bool setAndJudge(int, int);
+bool setAndJudge(const Block &,int, int);
 
 int gameEngineWork();
 
@@ -166,7 +157,7 @@ struct State
 	//TODO simplized to 0 1 2 3 (normally won't exceed 2)
 	short typeCount[7];
 	short nextType;
-	State() {}
+	State();
 	State(const int(&_grid)[MAPHEIGHT][MAPWIDTH],
 		const int(&_typeCount)[7], const int nextType);
 	operator Int256()const;
@@ -191,6 +182,7 @@ struct AI
 	unordered_map<State, int> mp;
 
 	Block bestChoice;
+	int blockForEnemy;
 
 	struct StateInfo
 	{
@@ -207,13 +199,17 @@ struct AI
 		bool operator()(const int a, const int b)const;
 	};
 
-	void GenerateStrategy(const State(&states)[2]);
+	void GenerateStrategy(const State &mine, const State &ops,int level);
 
 	void GenerateAllPossibleMove(const State &curState, StateInfo *info, int &totInfo, int role);
 
-	int negativeMaxSearch(const State &curState, int depth, int alpha, int beta, int role);
-
 	void GreedySearch(const State &curState, int role);
+
+	int sampleStrategy(
+		const int(&gridInfo)[2][MAPHEIGHT + 2][MAPWIDTH + 2], int(&typeCount)[2][7],
+		const int nextBlockType, int depth, int alpha, int beta, int role);
+
+	int negativeMaxSearch(const State &curState, int depth, int alpha, int beta, int role);
 
 };
 

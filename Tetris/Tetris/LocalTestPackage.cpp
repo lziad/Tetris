@@ -44,25 +44,17 @@ int gameEngineWork()
 	// Game start
 	while (true) {
 		// 决策、放方块，检测是否有人挂了
-		ais[0].negativeMaxSearch(curState[0], 1, -INF, INF, 0);
-		result = ais[0].bestChoice;
-		++result.x; ++result.y;
-		ais[0].negativeMaxSearch(curState[1], 1, -INF, INF, 1);
-		int tmp = ais[0].bestChoice.o;
+		ais[0].GenerateStrategy(curState[0], curState[1], 1);
 		gridsTransfer(Sample::gridInfo[0], curState[0]);
-		if (!setAndJudge(curState[0].nextType, 0)) {
+		if (!setAndJudge(ais[0].bestChoice, curState[0].nextType, 0)) {
 			cout << "Player 0 lose!" << endl;
 			break;
 		}
 		gridsTransfer(curState[0], Sample::gridInfo[0]);
 
-		ais[1].negativeMaxSearch(curState[1], 1, -INF, INF, 0);
-		result = ais[1].bestChoice;
-		++result.x; ++result.y;
-		ais[1].negativeMaxSearch(curState[0], 1, -INF, INF, 1);
+		ais[1].GenerateStrategy(curState[1], curState[0], 1);
 		gridsTransfer(Sample::gridInfo[1], curState[1]);
-		blockForEnemy = ais[1].bestChoice.o;
-		if (!setAndJudge(curState[1].nextType, 1)) {
+		if (!setAndJudge(ais[1].bestChoice, curState[1].nextType, 1)) {
 			cout << "Player 1 lose!" << endl;
 			break;
 		}
@@ -71,8 +63,8 @@ int gameEngineWork()
 		// 每回合输出一次
 		printField(Sample::gridInfo, PrintFieldDelay);
 
-		curState[0].nextType = blockForEnemy;
-		curState[1].nextType = tmp;
+		curState[0].nextType = ais[1].blockForEnemy;
+		curState[1].nextType = ais[0].blockForEnemy;
 
 		// 检查消去
 		Sample::eliminate(0);
@@ -94,9 +86,9 @@ int gameEngineWork()
 	return 0;
 }
 
-bool setAndJudge(int nextType, int role) {
+bool setAndJudge(const Block &block, int nextType, int role) {
 	Sample::Tetris tmp(nextType, role);
-	tmp.set(result);
+	tmp.set(block);
 	return tmp.place();
 }
 
