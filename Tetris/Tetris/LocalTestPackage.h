@@ -24,7 +24,7 @@
 #define ULL unsigned long long
 #define sleep(ms) std::this_thread::sleep_for(std::chrono::milliseconds(ms))
 #define DefaultMode 2
-#define PrintFieldDelay 30
+#define PrintFieldDelay 1000
 
 
 using namespace std;

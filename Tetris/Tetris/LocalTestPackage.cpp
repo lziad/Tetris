@@ -44,14 +44,13 @@ int gameEngineWork()
 	// Game start
 	while (true) {
 		// 决策、放方块，检测是否有人挂了
-		ais[0].GenerateStrategy(curState[0], curState[1], 1);
+        ais[0].GenerateStrategy(curState[0], curState[1], 1);
 		gridsTransfer(Sample::gridInfo[0], curState[0]);
 		if (!setAndJudge(ais[0].bestChoice, curState[0].nextType, 0)) {
 			cout << "Player 0 lose!" << endl;
 			break;
 		}
 		gridsTransfer(curState[0], Sample::gridInfo[0]);
-
 		ais[1].GenerateStrategy(curState[1], curState[0], 1);
 		gridsTransfer(Sample::gridInfo[1], curState[1]);
 		if (!setAndJudge(ais[1].bestChoice, curState[1].nextType, 1)) {
@@ -76,10 +75,15 @@ int gameEngineWork()
 			cout << "Player " << loser << " lose!" << endl;
 			break;
 		}
+        
+        gridsTransfer(curState[0], Sample::gridInfo[0]);
+        gridsTransfer(curState[1], Sample::gridInfo[1]);
 	}
 
 	// 终局图
-	printField(curState, PrintFieldDelay);
+    gridsTransfer(Sample::gridInfo[0], curState[0]);
+    gridsTransfer(Sample::gridInfo[1], curState[1]);
+	printField(Sample::gridInfo, PrintFieldDelay);
 	// 输出一下分数
 	cout << "Scores: " << Sample::score[0] << " vs " << Sample::score[1] << endl;
 
@@ -87,8 +91,9 @@ int gameEngineWork()
 }
 
 bool setAndJudge(const Block &block, int nextType, int role) {
+    Block mdzz = Block(block.x+1, block.y+1, block.o);
 	Sample::Tetris tmp(nextType, role);
-	tmp.set(block);
+	tmp.set(mdzz);
 	return tmp.place();
 }
 
@@ -140,7 +145,7 @@ void printField(const State(&state)[2], int delayMs, bool clean)
 void gridsTransfer(int(&dst)[MAPHEIGHT + 2][MAPWIDTH + 2], const State &state)
 {
 	for (int i = 0; i < MAPHEIGHT; i++)
-		for (int j = 0; j > MAPWIDTH; j++)
+		for (int j = 0; j < MAPWIDTH; j++)
 		{
 			dst[i + 1][j + 1] = state.grids[i][j];
 		}
@@ -149,7 +154,7 @@ void gridsTransfer(int(&dst)[MAPHEIGHT + 2][MAPWIDTH + 2], const State &state)
 void gridsTransfer(State &state, const int(&dst)[MAPHEIGHT + 2][MAPWIDTH + 2])
 {
 	for (int i = 0; i < MAPHEIGHT; i++)
-		for (int j = 0; j > MAPWIDTH; j++)
+		for (int j = 0; j < MAPWIDTH; j++)
 		{
 			state.grids[i][j] = dst[i + 1][j + 1];
 		}
