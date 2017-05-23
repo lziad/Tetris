@@ -380,7 +380,7 @@ int recoverState(int(&grids)[2][MAPHEIGHT + 2][MAPWIDTH + 2],
 	Json::Value input;
 	getJsonStr(cin, input);
 #ifndef _BOTZONE_ONLINE
-	//interpretSeverLog(input);
+	interpretSeverLog(input);
 #endif // !_BOTZONE_ONLINE
 
 	int curTurnID, tmpBlockType;
@@ -798,7 +798,7 @@ void AI::GreedySearch(const State &curState, int role)
 		if (maxCount - minCount == 2)
 		{
 			// 危险，找一个不是最大的块给对方吧
-			for (blockForEnemy = 0; blockForEnemy < 7; blockForEnemy++)
+			for (int blockForEnemy = 0; blockForEnemy < 7; blockForEnemy++)
 				if (curState.typeCount[blockForEnemy] != maxCount)
 					break;
 		}
@@ -1049,7 +1049,7 @@ int main()
 	// 0为红，1为蓝
 	int myColor;
 
-	State curStates[2];
+	State curState[2];
 
 	int nextType[2];
 	// 给对应玩家的各类块的数目总计
@@ -1069,11 +1069,11 @@ int main()
 
 		for (int i = 0; i < 2; i++)
 		{
-			curStates[i].nextType = nextType[i];
-			memcpy(curStates[i].typeCount, typeCount[i], sizeof(typeCount[i]));
+			curState[i].nextType = nextType[i];
+			memcpy(curState[i].typeCount, typeCount[i], sizeof(typeCount[i]));
 			for (int r = 0; r < MAPHEIGHT; r++)
 				for (int c = 0; c < MAPWIDTH; c++)
-					curStates[i].grids[r][c] = curGrid[i][r + 1][c + 1];
+					curState[i].grids[r][c] = curGrid[i][r + 1][c + 1];
 
 		}
 
@@ -1082,7 +1082,7 @@ int main()
 #endif // _BOTZONE_ONLINE
 
 		auto ai = new AI();
-		ai->GenerateStrategy(curStates[myColor], curStates[1 - myColor], 1);
+		ai->GenerateStrategy(curState[myColor], curState[1 - myColor], 1);
 		outputResult(ai->blockForEnemy, ai->bestChoice);
 	}
 #ifndef _BOTZONE_ONLINE
