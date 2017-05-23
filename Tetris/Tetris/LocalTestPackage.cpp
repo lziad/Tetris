@@ -1,6 +1,5 @@
 ﻿#include "LocalTestPackage.h"
 
-
 using std::cout;
 
 int interpretSeverLog(Json::Value & orig)
@@ -33,11 +32,8 @@ int gameEngineWork()
 	// init
 	State curState[2];
 	for (auto &i : curState)i.init();
-	//int nextType[2] = { 0 };
-	//int typeCount[2][7] = { 0 };
 	int loser = -1;
 	stateInit(Sample::gridInfo);
-	//printField(Sample::gridInfo);
 
 	auto ais = new AI[2];
 
