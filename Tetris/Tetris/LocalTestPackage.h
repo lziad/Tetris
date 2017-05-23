@@ -27,7 +27,6 @@
 #define DefaultMode 1
 #define PrintFieldDelay 300
 
-
 using namespace std;
 using namespace std::placeholders;
 
