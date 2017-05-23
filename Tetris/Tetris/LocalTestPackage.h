@@ -156,8 +156,8 @@ struct State
 
 	bool grids[20][10];
 	//TODO simplized to 0 1 2 3 (normally won't exceed 2)
-	short typeCount[7];
-	short nextType;
+	int typeCount[7];
+	int nextType;
 	State();
 	State(const int(&_grid)[MAPHEIGHT][MAPWIDTH],
 		const int(&_typeCount)[7], const int nextType);
