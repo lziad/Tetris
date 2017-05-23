@@ -795,7 +795,7 @@ void AI::GreedySearch(const State &curState, int role)
 	GenerateAllPossibleMove(curState, info, totInfo, role);
 
 	qsort(info, totInfo, sizeof(StateInfo), [](const void *va, const void *vb) {
-		return ((const StateInfo*)va)->score - ((const StateInfo*)vb)->score;
+		return ((const StateInfo*)vb)->score - ((const StateInfo*)va)->score;
 	});
 	bestChoice = info[0].choice;
 
