@@ -1,4 +1,3 @@
-﻿
 
 
 
@@ -26,6 +25,8 @@
 /* 1     simulate botzone.org	*/
 /* 2     Host local game		*/
 int MODE;
+
+Block::Block() {};
 
 Block::Block(const int &x, const int &y, const int &o)
 :x(x), y(y), o(o) {}
@@ -56,242 +57,250 @@ bool operator==(const State &a, const State &b)
 
 namespace Sample
 {
-    /* 先y后x，记录地图状态，0为空，1为以前放置，2为刚刚放置，负数为越界	  */
-    /* （2用于在清行后将最后一步撤销再送给对方）						  */
-    int gridInfo[2][MAPHEIGHT + 2][MAPWIDTH + 2] = { 0 };
-    
-    // 代表分别向对方转移的行
-    int trans[2][4][MAPWIDTH + 2] = { 0 };
-    // 转移行数
-    int transCount[2] = { 0 };
-    // 运行eliminate后的当前高度
-    int maxHeight[2] = { 0 };
-    // 双方分数，用于平局时判断
-    int score[2] = { 0 };
-    
-    Tetris &Tetris::set(int x, int y, int o)
-    {
-        
-        block.x = x == -1 ? block.x : x;
-        block.y = y == -1 ? block.y : y;
-        block.o = o == -1 ? block.o : o;
-        return *this;
-    }
-    
-    Tetris &Tetris::set(const Block& _block)
-    {
-        
-        block.x = _block.x == -1 ? block.x : _block.x;
-        block.y = _block.y == -1 ? block.y : _block.y;
-        block.o = _block.o == -1 ? block.o : _block.o;
-        return *this;
-    }
-    
-    // 判断当前位置是否合法
-    inline bool Tetris::isValid(int x, int y, int o)
-    {
-        
-        x = x == -1 ? block.x : x;
-        y = y == -1 ? block.y : y;
-        o = o == -1 ? block.o : o;
-        if (o < 0 || o > 3)
-            return false;
-        
-        int i, tmpX, tmpY;
-        for (i = 0; i < 4; i++)
-        {
-            tmpX = x + shape[o][2 * i];
-            tmpY = y + shape[o][2 * i + 1];
-            if (tmpX < 1 || tmpX > MAPWIDTH ||
-                tmpY < 1 || tmpY > MAPHEIGHT ||
-                Sample::gridInfo[color][tmpY][tmpX] != 0)
-                return false;
-        }
-        return true;
-    }
-    
-    // 判断是否落地
-    bool Tetris::onGround()
-    {
-        if (isValid() && !isValid(-1, block.y - 1))
-            return true;
-        return false;
-    }
-    
-    // 将方块放置在场地上
-    bool Tetris::place()
-    {
-        if (!onGround())
-            return false;
-        
-        int i, tmpX, tmpY;
-        for (i = 0; i < 4; i++)
-        {
-            tmpX = block.x + shape[block.o][2 * i];
-            tmpY = block.y + shape[block.o][2 * i + 1];
-            Sample::gridInfo[color][tmpY][tmpX] = 2;
-        }
-        return true;
-    }
-    
-    // 检查能否逆时针旋转自己到o
-    bool Tetris::rotation(int o)
-    {
-        if (o < 0 || o > 3)
-            return false;
-        
-        if (block.o == o)
-            return true;
-        
-        int fromO = block.o;
-        while (true)
-        {
-            if (!isValid(-1, -1, fromO))
-                return false;
-            
-            if (fromO == o)
-                break;
-            
-            fromO = (fromO + 1) % 4;
-        }
-        return true;
-    }
-    
-    // 检查能否从场地顶端直接落到当前位置
-    inline bool checkDirectDropTo(int color, int blockType, int x, int y, int o)
-    {
-        auto &def = blockShape[blockType][o];
-        for (; y <= MAPHEIGHT; y++)
-            for (int i = 0; i < 4; i++)
-            {
-                int _x = def[i * 2] + x, _y = def[i * 2 + 1] + y;
-                if (_y > MAPHEIGHT)
-                    continue;
-                if (_y < 1 || _x < 1 || _x > MAPWIDTH || Sample::gridInfo[color][_y][_x])
-                    return false;
-            }
-        return true;
-    }
-    // 消去行
-    void eliminate(int color)
-    {
-        int &count = Sample::transCount[color] = 0;
-        int i, j, emptyFlag, fullFlag;
-        Sample::maxHeight[color] = MAPHEIGHT;
-        for (i = 1; i <= MAPHEIGHT; i++)
-        {
-            emptyFlag = 1;
-            fullFlag = 1;
-            for (j = 1; j <= MAPWIDTH; j++)
-            {
-                if (Sample::gridInfo[color][i][j] == 0)
-                    fullFlag = 0;
-                else
-                    emptyFlag = 0;
-            }
-            if (fullFlag)
-            {
-                for (j = 1; j <= MAPWIDTH; j++)
-                {
-                    // 注意这里只转移以前的块，不包括最后一次落下的块（“撤销最后一步”）
-                    Sample::trans[color][count][j] = Sample::gridInfo[color][i][j] == 1 ? 1 : 0;
-                    Sample::gridInfo[color][i][j] = 0;
-                }
-                count++;
-            }
-            else if (emptyFlag)
-            {
-                Sample::maxHeight[color] = i - 1;
-                break;
-            }
-            else
-                for (j = 1; j <= MAPWIDTH; j++)
-                {
-                    Sample::gridInfo[color][i - count][j] =
-                    Sample::gridInfo[color][i][j] > 0 ? 1 : Sample::gridInfo[color][i][j];
-                    if (count)
-                        Sample::gridInfo[color][i][j] = 0;
-                }
-        }
-        Sample::maxHeight[color] -= count;
-        Sample::score[color] += elimBonus[count];
-    }
-    
-    // 转移双方消去的行，返回-1表示继续，否则返回输者
-    int transfer()
-    {
-        int color1 = 0, color2 = 1;
-        if (Sample::transCount[color1] == 0 && Sample::transCount[color2] == 0)
-            return -1;
-        if (Sample::transCount[color1] == 0 || Sample::transCount[color2] == 0)
-        {
-            if (Sample::transCount[color1] == 0 && Sample::transCount[color2] > 0)
-                swap(color1, color2);
-            int h2;
-            Sample::maxHeight[color2] = h2 = Sample::maxHeight[color2] + Sample::transCount[color1];
-            if (h2 > MAPHEIGHT)
-                return color2;
-            int i, j;
-            
-            for (i = h2; i > Sample::transCount[color1]; i--)
-                for (j = 1; j <= MAPWIDTH; j++)
-                    Sample::gridInfo[color2][i][j] = Sample::gridInfo[color2][i - Sample::transCount[color1]][j];
-            
-            for (i = Sample::transCount[color1]; i > 0; i--)
-                for (j = 1; j <= MAPWIDTH; j++)
-                    Sample::gridInfo[color2][i][j] = Sample::trans[color1][i - 1][j];
-            return -1;
-        }
-        else
-        {
-            int h1, h2;
-            Sample::maxHeight[color1] = h1 = Sample::maxHeight[color1] + Sample::transCount[color2];//从color1处移动count1去color2
-            Sample::maxHeight[color2] = h2 = Sample::maxHeight[color2] + Sample::transCount[color1];
-            
-            if (h1 > MAPHEIGHT) {
-                if (h2 > MAPHEIGHT)
-                    return (score[color1] < score[color2] ? color1 : color2);
-                return color1;
-            }
-            if (h2 > MAPHEIGHT) return color2;
-            
-            int i, j;
-            for (i = h2; i > Sample::transCount[color1]; i--)
-                for (j = 1; j <= MAPWIDTH; j++)
-                    Sample::gridInfo[color2][i][j] = Sample::gridInfo[color2][i - Sample::transCount[color1]][j];
-            
-            for (i = Sample::transCount[color1]; i > 0; i--)
-                for (j = 1; j <= MAPWIDTH; j++)
-                    Sample::gridInfo[color2][i][j] = Sample::trans[color1][i - 1][j];
-            
-            for (i = h1; i > Sample::transCount[color2]; i--)
-                for (j = 1; j <= MAPWIDTH; j++)
-                    Sample::gridInfo[color1][i][j] = Sample::gridInfo[color1][i - Sample::transCount[color2]][j];
-            
-            for (i = Sample::transCount[color2]; i > 0; i--)
-                for (j = 1; j <= MAPWIDTH; j++)
-                    Sample::gridInfo[color1][i][j] = Sample::trans[color2][i - 1][j];
-            
-            return -1;
-        }
-    }
-    
-    // 颜色方还能否继续游戏 (orignal canput)
-    inline bool canContinue(int color, int blockType)
-    {
-        Tetris t(blockType, color);
-        for (int y = MAPHEIGHT; y >= 1; y--)
-            for (int x = 1; x <= MAPWIDTH; x++)
-                for (int o = 0; o < 4; o++)
-                {
-                    t.set(x, y, o);
-                    if (t.isValid() && checkDirectDropTo(color, blockType, x, y, o))
-                        return true;
-                }
-        return false;
-    }
-    
-    
+
+	/* 先y后x，记录地图状态，0为空，1为以前放置，2为刚刚放置，负数为越界	  */
+	/* （2用于在清行后将最后一步撤销再送给对方）						  */
+	int gridInfo[2][MAPHEIGHT + 2][MAPWIDTH + 2] = { 0 };
+
+	// 代表分别向对方转移的行
+	int trans[2][4][MAPWIDTH + 2] = { 0 };
+	// 转移行数
+	int transCount[2] = { 0 };
+	// 运行eliminate后的当前高度
+	int maxHeight[2] = { 0 };
+	// 双方分数，用于平局时判断
+	int score[2] = { 0 };
+
+	Tetris &Tetris::set(int x, int y, int o)
+	{
+
+		block.x = x == -1 ? block.x : x;
+		block.y = y == -1 ? block.y : y;
+		block.o = o == -1 ? block.o : o;
+		return *this;
+	}
+
+	Tetris &Tetris::set(const Block& _block)
+	{
+
+		block.x = _block.x == -1 ? block.x : _block.x;
+		block.y = _block.y == -1 ? block.y : _block.y;
+		block.o = _block.o == -1 ? block.o : _block.o;
+		return *this;
+	}
+
+	// 判断当前位置是否合法
+	inline bool Tetris::isValid(int x, int y, int o)
+	{
+
+		x = x == -1 ? block.x : x;
+		y = y == -1 ? block.y : y;
+		o = o == -1 ? block.o : o;
+		if (o < 0 || o > 3)
+			return false;
+
+		int i, tmpX, tmpY;
+		for (i = 0; i < 4; i++)
+		{
+			tmpX = x + shape[o][2 * i];
+			tmpY = y + shape[o][2 * i + 1];
+			if (tmpX < 1 || tmpX > MAPWIDTH ||
+				tmpY < 1 || tmpY > MAPHEIGHT ||
+				Sample::gridInfo[color][tmpY][tmpX] != 0)
+				return false;
+		}
+		return true;
+	}
+
+	// 判断是否落地
+	bool Tetris::onGround()
+	{
+		if (isValid() && !isValid(-1, block.y - 1))
+			return true;
+		int i, tmpX, tmpY;
+		for (i = 0; i < 4; i++)
+		{
+			tmpX = block.x + shape[block.o][2 * i];
+			tmpY = block.y + shape[block.o][2 * i + 1];
+		}
+		return false;
+	}
+
+	// 将方块放置在场地上
+	bool Tetris::place()
+	{
+		if (!onGround())
+			return false;
+
+		int i, tmpX, tmpY;
+		for (i = 0; i < 4; i++)
+		{
+			tmpX = block.x + shape[block.o][2 * i];
+			tmpY = block.y + shape[block.o][2 * i + 1];
+			Sample::gridInfo[color][tmpY][tmpX] = 2;
+		}
+		return true;
+	}
+
+	// 检查能否逆时针旋转自己到o
+	bool Tetris::rotation(int o)
+	{
+		if (o < 0 || o > 3)
+			return false;
+
+		if (block.o == o)
+			return true;
+
+		int fromO = block.o;
+		while (true)
+		{
+			if (!isValid(-1, -1, fromO))
+				return false;
+
+			if (fromO == o)
+				break;
+
+			fromO = (fromO + 1) % 4;
+		}
+		return true;
+	}
+
+	// 检查能否从场地顶端直接落到当前位置
+	inline bool checkDirectDropTo(int color, int blockType, int x, int y, int o)
+	{
+		auto &def = blockShape[blockType][o];
+		for (; y <= MAPHEIGHT; y++)
+			for (int i = 0; i < 4; i++)
+			{
+				int _x = def[i * 2] + x, _y = def[i * 2 + 1] + y;
+				if (_y > MAPHEIGHT)
+					continue;
+				if (_y < 1 || _x < 1 || _x > MAPWIDTH || Sample::gridInfo[color][_y][_x])
+					return false;
+			}
+		return true;
+	}
+	// 消去行
+	void eliminate(int color)
+	{
+		int &count = Sample::transCount[color] = 0;
+		int i, j, emptyFlag, fullFlag;
+		Sample::maxHeight[color] = MAPHEIGHT;
+		for (i = 1; i <= MAPHEIGHT; i++)
+		{
+			emptyFlag = 1;
+			fullFlag = 1;
+			for (j = 1; j <= MAPWIDTH; j++)
+			{
+				if (Sample::gridInfo[color][i][j] == 0)
+					fullFlag = 0;
+				else
+					emptyFlag = 0;
+			}
+			if (fullFlag)
+			{
+				for (j = 1; j <= MAPWIDTH; j++)
+				{
+					// 注意这里只转移以前的块，不包括最后一次落下的块（“撤销最后一步”）
+					Sample::trans[color][count][j] = Sample::gridInfo[color][i][j] == 1 ? 1 : 0;
+					Sample::gridInfo[color][i][j] = 0;
+				}
+				count++;
+			}
+			else if (emptyFlag)
+			{
+				Sample::maxHeight[color] = i - 1;
+				break;
+			}
+			else
+				for (j = 1; j <= MAPWIDTH; j++)
+				{
+					Sample::gridInfo[color][i - count][j] =
+						Sample::gridInfo[color][i][j] > 0 ? 1 : Sample::gridInfo[color][i][j];
+					if (count)
+						Sample::gridInfo[color][i][j] = 0;
+				}
+		}
+		Sample::maxHeight[color] -= count;
+		Sample::score[color] += elimBonus[count];
+	}
+
+	// 转移双方消去的行，返回-1表示继续，否则返回输者
+	int transfer()
+	{
+		int color1 = 0, color2 = 1;
+		if (Sample::transCount[color1] == 0 && Sample::transCount[color2] == 0)
+			return -1;
+		if (Sample::transCount[color1] == 0 || Sample::transCount[color2] == 0)
+		{
+			if (Sample::transCount[color1] == 0 && Sample::transCount[color2] > 0)
+				swap(color1, color2);
+			int h2;
+			Sample::maxHeight[color2] = h2 = Sample::maxHeight[color2] + Sample::transCount[color1];
+			if (h2 > MAPHEIGHT)
+				return color2;
+			int i, j;
+
+			for (i = h2; i > Sample::transCount[color1]; i--)
+				for (j = 1; j <= MAPWIDTH; j++)
+					Sample::gridInfo[color2][i][j] = Sample::gridInfo[color2][i - Sample::transCount[color1]][j];
+
+			for (i = Sample::transCount[color1]; i > 0; i--)
+				for (j = 1; j <= MAPWIDTH; j++)
+					Sample::gridInfo[color2][i][j] = Sample::trans[color1][i - 1][j];
+			return -1;
+		}
+		else
+		{
+			int h1, h2;
+			Sample::maxHeight[color1] = h1 = Sample::maxHeight[color1] + Sample::transCount[color2];//从color1处移动count1去color2
+			Sample::maxHeight[color2] = h2 = Sample::maxHeight[color2] + Sample::transCount[color1];
+
+			if (h1 > MAPHEIGHT) {
+				if (h2 > MAPHEIGHT)
+					return (score[color1] < score[color2] ? color1 : color2);
+				return color1;
+			}
+			if (h2 > MAPHEIGHT) return color2;
+
+			int i, j;
+			for (i = h2; i > Sample::transCount[color1]; i--)
+				for (j = 1; j <= MAPWIDTH; j++)
+					Sample::gridInfo[color2][i][j] = Sample::gridInfo[color2][i - Sample::transCount[color1]][j];
+
+			for (i = Sample::transCount[color1]; i > 0; i--)
+				for (j = 1; j <= MAPWIDTH; j++)
+					Sample::gridInfo[color2][i][j] = Sample::trans[color1][i - 1][j];
+
+			for (i = h1; i > Sample::transCount[color2]; i--)
+				for (j = 1; j <= MAPWIDTH; j++)
+					Sample::gridInfo[color1][i][j] = Sample::gridInfo[color1][i - Sample::transCount[color2]][j];
+
+			for (i = Sample::transCount[color2]; i > 0; i--)
+				for (j = 1; j <= MAPWIDTH; j++)
+					Sample::gridInfo[color1][i][j] = Sample::trans[color2][i - 1][j];
+
+			return -1;
+		}
+	}
+
+	// 颜色方还能否继续游戏 (orignal canput)
+	inline bool canContinue(int color, int blockType)
+	{
+		Tetris t(blockType, color);
+		for (int y = MAPHEIGHT; y >= 1; y--)
+			for (int x = 1; x <= MAPWIDTH; x++)
+				for (int o = 0; o < 4; o++)
+				{
+					t.set(x, y, o);
+					if (t.isValid() && checkDirectDropTo(color, blockType, x, y, o))
+						return true;
+				}
+		return false;
+	}
+
+
+
 }
 
 //both required in botzone.org and localTest
@@ -444,91 +453,144 @@ int recoverState(int(&grids)[2][MAPHEIGHT + 2][MAPWIDTH + 2],
 
 void AI::GenerateStrategy(const State &mine, const State &ops, int level)
 {
-    if (level == 2)
-    {
-        negativeMaxSearch(mine, 1, -INF, INF, 0);
-        negativeMaxSearch(ops, 1, -INF, INF, 1);
-    }
-    if (level == 1)
-    {
-        GreedySearch(mine, 0);
-        GreedySearch(ops, 1);
-    }
+
+
+	if (level == 2)
+	{
+#ifndef QuickTest
+		mp.clear();
+#else
+		TODO;
+#endif // !QuickTest
+		negativeMaxSearch(mine, 1, -INF, INF, 0);
+#ifndef QuickTest
+		mp.clear();
+#else
+		TODO;
+#endif // !QuickTest
+		negativeMaxSearch(ops, 1, -INF, INF, 1);
+	}
+	if (level == 1)
+	{
+		GreedySearch(mine, 0);
+		GreedySearch(ops, 1);
+	}
+}
+
+void AI::GreedySearch(const State &curState, int role)
+{
+	if (role == 1)
+	{
+		// 再看看给对方什么好
+		int maxCount = 0, minCount = 99;
+		for (int i = 0; i < 7; i++)
+		{
+			if (curState.typeCount[i] > maxCount)
+				maxCount = curState.typeCount[i];
+			if (curState.typeCount[i] < minCount)
+				minCount = curState.typeCount[i];
+		}
+		if (maxCount - minCount == 2)
+		{
+			// 危险，找一个不是最大的块给对方吧
+			for (blockForEnemy = 0; blockForEnemy < 7; blockForEnemy++)
+				if (curState.typeCount[blockForEnemy] != maxCount)
+					break;
+		}
+		else
+		{
+			blockForEnemy = rand() % 7;
+		}
+
+		//bestChoice.o = blockForEnemy;
+
+		return;
+
+	}
+	int totInfo = 0;
+	StateInfo info[180];
+	GenerateAllPossibleMove(curState, info, totInfo, role);
+
+	qsort(info, totInfo, sizeof(StateInfo), [](const void *va, const void *vb) {
+		return ((const StateInfo*)vb)->score - ((const StateInfo*)va)->score;
+	});
+	bestChoice = info[0].choice;
+
+
+
 }
 
 //role: 0, in my field; 1, in op's field
 int AI::negativeMaxSearch(const State &curState, int depth, int alpha, int beta, int role)
 {
-    int score;
-    
-    // check whether current state has been calculated
-    if (mp.find(curState) != mp.end())
-        return mp.find(curState)->second;
-    
-    //!!
-    // 搜索深度达到 DEPTH + 1 ，已经胜利(改成不能放），则返回
-    score = evaluate(curState, role);
-    //!!! == must be changed
-    if (depth == DEPTH + 1/* || depth > 1 && abs(score) == LostValue*/) {
-        // 不同深度是否需要不同结果？
-        mp.insert({ curState, score });
-        return score;
-    }
-    
-    int totInfo = 0;
-    StateInfo info[180];
-    int index[180];
-    // 产生所有的走法
-    GenerateAllPossibleMove(curState, info, totInfo, role);
-    for (int i = 0; i < totInfo; i++)index[i] = i;
-    
-    //x1
-    
-    sort(index, index + totInfo, IndexCmp(info));
-    
-    int new_alpha = alpha;
-    Block bestChoice{ 0,0,0 };
-    
-    score = -INF;
-    
-    for (int i = 0; i < totInfo; ++i) {
-        
-        StateInfo &cur = info[index[i]];
-        
-        // 递归
-        int result = -negativeMaxSearch(cur.state, depth + 1, -beta, -new_alpha, 1 - role);
-        
-        if (result > score) {
-            bestChoice = cur.choice;
-            score = result;
-        }
-        
-        // beta剪枝
-        if (score >= beta) {
-            break;
-        }
-        
-        // 更新最高分
-        if (score > new_alpha) {
-            new_alpha = score;
-        }
-    }
-    
-    //x2
-    
-    if (depth == 1) {
-        if (role == 0)
-            AI::bestChoice = bestChoice;
-        else
-            AI::blockForEnemy = bestChoice.o;
-        
-    }
-    
-    // hash
-    mp.insert({ curState,score });
-    
-    return score;
-}
+	int score;
+
+	// check whether current state has been calculated
+	if (mp.find({ curState,depth }) != mp.end())
+		return mp.find({ curState,depth })->second;
+
+	// 搜索终点深度： DEPTH + 1	
+	//!!! == must be changed	//???
+	if (depth == DEPTH + 1/* || depth > 1 && abs(score) == LostValue*/) {	
+		score = evaluate(curState, role);
+		if (role)score = -score;
+		// 不同深度需要不同结果!
+		mp.insert({ { curState,depth }, score });
+		return score;
+	}
+
+	int totInfo = 0;
+	StateInfo info[180];
+	int index[180];
+	// 产生所有的走法
+	GenerateAllPossibleMove(curState, info, totInfo, role);
+
+	for (int i = 0; i < totInfo; i++)index[i] = i;
+
+	//x1
+
+	sort(index, index + totInfo, IndexCmp(info));
+
+	int new_alpha = alpha;
+	Block bestChoice{ 0,0,0 };
+
+	score = -INF;
+
+	for (int i = 0; i < totInfo; ++i) {
+
+		StateInfo &cur = info[index[i]];
+
+		// 递归
+		int result = -negativeMaxSearch(cur.state, depth + 1, -beta, -new_alpha, 1 - role);
+
+		if (result > score) {
+			bestChoice = cur.choice;
+			score = result;
+		}
+
+		// beta剪枝
+		if (score >= beta) {
+			break;
+		}
+
+		// 更新最高分
+		if (score > new_alpha) {
+			new_alpha = score;
+		}
+	}
+
+	//x2
+
+	if (depth == 1) {
+		if (role == 0)
+			AI::bestChoice = bestChoice;
+		else
+			AI::blockForEnemy = bestChoice.o;
+
+	}
+
+	// hash
+	mp.insert({ { curState,depth },score });
 
 void input(State &aaa) {
     char c;
@@ -544,37 +606,41 @@ void input(State &aaa) {
 
 void AI::GenerateAllPossibleMove(const State &curState, StateInfo *info, int &totInfo, int role)
 {
-    totInfo = 0;
     
-    if (role == 1)
-    {
-        int containZero = 0;
-        for (int i = 0; i < 7; i++)
-        {
-            if (curState.typeCount[i] == 0)
-            {
-                containZero = 1;
-                break;
-            }
-        }
-        
-        for (int i = 0; i < 7; i++)
-        {
-            if (curState.typeCount[i] < 2 || curState.typeCount[i] == 2 && !containZero)
-            {
-                info[totInfo].state = curState;
-                info[totInfo].state.nextType = i;
-                //abnormal use of o
-                info[totInfo].choice.o = i;
-                ++(info[totInfo].state.typeCount[i]);
-                totInfo++;
-            }
-        }
-        
-        return;
-    }
-    
-    int type = curState.nextType;
+ 
+	totInfo = 0;
+
+	if (role == 1)
+	{
+		int containZero = 0;
+		for (int i = 0; i < 7; i++)
+		{
+			if (curState.typeCount[i] == 0)
+			{
+				containZero = 1;
+				break;
+			}
+		}
+
+		for (int i = 0; i < 7; i++)
+		{
+			if (curState.typeCount[i] < 2 || curState.typeCount[i] == 2 && !containZero)
+			{
+
+				info[totInfo].state = curState;
+				info[totInfo].state.nextType = i;
+				//abnormal use of o
+				info[totInfo].choice.o = i;
+				++(info[totInfo].state.typeCount[curState.nextType]);
+				totInfo++;
+			}
+		}
+
+		
+
+		return;
+	}
+  int type = curState.nextType;
     Sample::Tetris t(type, 0);
     int can[MAPHEIGHT + 1][MAPWIDTH + 1] = { 0 };
     
@@ -783,12 +849,11 @@ determined:
     return 0;
 }
 
-
-
 bool AI::IndexCmp::operator ()(const int a, const int b)const
 {
     return info[a].score > info[b].score;
 }
+
 
 void AI::GreedySearch(const State &curState, int role)
 {
@@ -833,6 +898,7 @@ void AI::GreedySearch(const State &curState, int role)
     
 }
 
+
 void outputResult(const int &blockForEnemy, const Block &result)
 {
     Json::Value output;
@@ -848,74 +914,76 @@ void outputResult(const int &blockForEnemy, const Block &result)
 // 能不能以o的姿势放到(x, y)这个位置且刚好挨地  (orignal canPutThere)
 bool canReach(int color, int blockType, int x, int y, int o)
 {
-    Sample::Tetris t(blockType, color);
-    if (y > 1) {
-        t.set(x, y - 1, o);
-        if (t.isValid()) {
-            // 都没挨地！
-            return false;
-        }
-    }
-    
-    int can[MAPWIDTH + 1] = { 0 };
-    // 枚举出最顶上那行所有可能的姿态和位置
-    for (int i = 1; i <= MAPWIDTH; ++i) {
-        for (int k = 0; k < 4; ++k) {
-            t.set(i, MAPHEIGHT - 1, k);
-            if (t.isValid()) {
-                can[i] |= (1 << k);
-            }
-        }
-    }
-    // 往下降一格，每个方块原地转转看看行不行，再往左看看行不行，再原地转转看看行不行
-    for (int j = MAPHEIGHT - 1; j > y; --j) {
-        for (int i = 1; i <= MAPWIDTH; ++i) {
-            // 原地转；can[i] == 15就是哪个方向都行，就不用转了
-            for (int k = 0; k < 4 && can[i] != 15; ++k) {
-                if (!(can[i] & (1 << k)))
-                    continue;
-                int z = (k + 1) & 3;
-                while (can[i] != 15) {
-                    t.set(i, j, z);
-                    if (!t.isValid())
-                        break;
-                    can[i] |= (1 << z);
-                    z = (++z) & 3;
-                }
-            }
-            // 往左
-            for (int k = 0; k < 4; ++k) {
-                int p = i;
-                while (--p && !(can[p] & (1 << k))) {
-                    t.set(p, j, k);
-                    if (t.isValid()) {
-                        can[p] |= (1 << k);
-                        // 再转转
-                        int z = (k + 1) & 3;
-                        while (can[p] != 15) {
-                            t.set(p, j, z);
-                            if (!t.isValid())
-                                break;
-                            can[p] |= (1 << z);
-                            z = (++z) & 3;
-                        }
-                    }
-                }
-            }
-        }
-        // 掉不下去的就不管了
-        for (int i = 1; i <= MAPWIDTH; ++i) {
-            for (int k = 0; k < 4; ++k) {
-                if (!(can[i] & (1 << k)))
-                    continue;
-                t.set(i, j - 1, k);
-                if (!t.isValid()) {
-                    can[i] &= ~(1 << k);
-                }
-            }
-        }
-    }
-    return bool(can[x] & (1 << o));
+
+	Sample::Tetris t(blockType, color);
+	if (y > 1) {
+		t.set(x, y - 1, o);
+		if (t.isValid()) {
+			// 都没挨地！
+			return false;
+		}
+	}
+
+	int can[MAPWIDTH + 1] = { 0 };
+	// 枚举出最顶上那行所有可能的姿态和位置
+	for (int i = 1; i <= MAPWIDTH; ++i) {
+		for (int k = 0; k < 4; ++k) {
+			t.set(i, MAPHEIGHT - 1, k);
+			if (t.isValid()) {
+				can[i] |= (1 << k);
+			}
+		}
+	}
+	// 往下降一格，每个方块原地转转看看行不行，再往左看看行不行，再原地转转看看行不行
+	for (int j = MAPHEIGHT - 1; j > y; --j) {
+		for (int i = 1; i <= MAPWIDTH; ++i) {
+			// 原地转；can[i] == 15就是哪个方向都行，就不用转了
+			for (int k = 0; k < 4 && can[i] != 15; ++k) {
+				if (!(can[i] & (1 << k)))
+					continue;
+				int z = (k + 1) & 3;
+				while (can[i] != 15) {
+					t.set(i, j, z);
+					if (!t.isValid())
+						break;
+					can[i] |= (1 << z);
+					z = (++z) & 3;
+				}
+			}
+			// 往左
+			for (int k = 0; k < 4; ++k) {
+				int p = i;
+				while (--p && !(can[p] & (1 << k))) {
+					t.set(p, j, k);
+					if (t.isValid()) {
+						can[p] |= (1 << k);
+						// 再转转
+						int z = (k + 1) & 3;
+						while (can[p] != 15) {
+							t.set(p, j, z);
+							if (!t.isValid())
+								break;
+							can[p] |= (1 << z);
+							z = (++z) & 3;
+						}
+					}
+				}
+			}
+		}
+		// 掉不下去的就不管了
+		for (int i = 1; i <= MAPWIDTH; ++i) {
+			for (int k = 0; k < 4; ++k) {
+				if (!(can[i] & (1 << k)))
+					continue;
+				t.set(i, j - 1, k);
+				if (!t.isValid()) {
+					can[i] &= ~(1 << k);
+				}
+			}
+		}
+	}
+	return can[x] & (1 << o);
+
 }
 
 //!! adjusted gridInfo size
@@ -978,41 +1046,19 @@ State::State(const int(&_grid)[MAPHEIGHT][MAPWIDTH],
              const int(&_typeCount)[7], const int nextType)
 :nextType(nextType)
 {
-    for (int i = 0; i < 20; i++)
-    {
-        for (int j = 0; j < 10; j++)
-        {
-            grids[i][j] = (bool)_grid[i][j];
-        }
-    }
-    memcpy(typeCount, _typeCount, sizeof(typeCount));
-    auto min = *min_element(typeCount, typeCount + 7);
-    for (int i = 0; i < 7; i++)
-        typeCount[i] -= min;
+	for (int i = 0; i < 20; i++)
+	{
+		for (int j = 0; j < 10; j++)
+		{
+			grids[i][j] = _grid[i][j];
+		}
+	}
+	memcpy(typeCount, _typeCount, sizeof(typeCount));
+	auto min = *min_element(typeCount, typeCount + 7);
+	for (int i = 0; i < 7; i++)
+		typeCount[i] -= min;
 }
 
-State::operator Int256()const
-{
-    Int256 ret;
-    //memset(ret.data, 0, sizeof(ret.data));
-    for (int d = 0; d < 3; d++)
-    {
-        for (int i = 0; i < 63; i++)
-        {
-            if (grids[(d * 64 + i) / 10][(d * 64 + i) % 10])
-                ret.data[d] += 1ull << i;
-        }
-    }
-    for (int i = 2; i < 9; i++)
-        if (grids[19][i])
-            ret.data[3] += 1ull << i;
-    for (int i = 0; i < 7; i++)
-    {
-        ret.data[3] += typeCount[i] << (i * 2 + 10);
-    }
-    ret.data[3] += nextType << 30;
-    return ret;
-}
 
 void State::init()
 {
@@ -1026,14 +1072,35 @@ void State::init()
 
 namespace std
 {
-    unsigned hash<State>::operator()(const State &state)const
-    {
-        Int256 i = state;
-        return hash<ULL>()(i.data[0]) ^
-        hash<ULL>()(i.data[1]) ^
-        hash<ULL>()(i.data[2]) ^
-        hash<ULL>()(i.data[3]);
-    }
+
+	unsigned hash<pair<State, int>>::operator()(const pair<State, int> &state)const
+	{
+		Int256 ret;
+		//memset(ret.data, 0, sizeof(ret.data));
+		for (int d = 0; d < 3; d++)
+		{
+			for (int i = 0; i < 63; i++)
+			{
+				if (state.first.grids[(d * 64 + i) / 10][(d * 64 + i) % 10])
+					ret.data[d] |= 1ull << i;
+			}
+		}
+		for (int i = 2; i < 9; i++)
+			if (state.first.grids[19][i])
+				ret.data[3] |= 1ull << i;
+		for (int i = 0; i < 7; i++)
+		{
+			ret.data[3] |= state.first.typeCount[i] << (i * 2 + 10);
+		}
+		ret.data[3] |= state.first.nextType << 30;
+		ret.data[3] |= (ULL)(state.second) << 40;
+
+		return hash<ULL>()(ret.data[0]) ^
+			hash<ULL>()(ret.data[1]) ^
+			hash<ULL>()(ret.data[2]) ^
+			hash<ULL>()(ret.data[3]);
+	}
+
 }
 
 // 去掉了没用的参数检查
@@ -1054,6 +1121,7 @@ inline bool Sample::Tetris::isValid(const State &curState, int x, int y, int o)
 
 int main()
 {
+
     // 0为红，1为蓝
     int myColor;
     
@@ -1085,6 +1153,7 @@ int main()
             
         }
         
+
 #ifndef _BOTZONE_ONLINE
         printField(curGrid);
 #endif // _BOTZONE_ONLINE
