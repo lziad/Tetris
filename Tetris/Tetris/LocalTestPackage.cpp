@@ -31,7 +31,11 @@ int gameEngineWork()
 {
 	// init
 	State curState[2];
-	for (auto &i : curState)i.init();
+	for (auto &i : curState) 
+	{
+		i.init();
+		i.nextType = rand() % 7;
+	}
 	int loser = -1;
 	stateInit(Sample::gridInfo);
 
@@ -40,16 +44,16 @@ int gameEngineWork()
 	// Game start
 	while (true) {
 		// 决策、放方块，检测是否有人挂了
-        ais[0].GenerateStrategy(curState[0], curState[1], 1);
+        ais[0].GenerateStrategy(curState[0], curState[1], 2);
 		gridsTransfer(Sample::gridInfo[0], curState[0]);
-		if (!setAndJudge(ais[0].bestChoice, curState[0].nextType, 0)) {
+		if (!setAndJudge(ais[0].bestChoice, curState[0], 0)) {
 			cout << "Player 0 lose!" << endl;
 			break;
 		}
 		gridsTransfer(curState[0], Sample::gridInfo[0]);
-		ais[1].GenerateStrategy(curState[1], curState[0], 1);
+		ais[1].GenerateStrategy(curState[1], curState[0], 2);
 		gridsTransfer(Sample::gridInfo[1], curState[1]);
-		if (!setAndJudge(ais[1].bestChoice, curState[1].nextType, 1)) {
+		if (!setAndJudge(ais[1].bestChoice, curState[1], 1)) {
 			cout << "Player 1 lose!" << endl;
 			break;
 		}
@@ -86,10 +90,11 @@ int gameEngineWork()
 	return 0;
 }
 
-bool setAndJudge(const Block &block, int nextType, int role) {
-    Block mdzz = Block(block.x+1, block.y+1, block.o);
-	Sample::Tetris tmp(nextType, role);
+bool setAndJudge(const Block &choice, State &state, int role) {
+    Block mdzz = Block(choice.x+1, choice.y+1, choice.o);
+	Sample::Tetris tmp(state.nextType, role);
 	tmp.set(mdzz);
+	state.typeCount[state.nextType]++;
 	return tmp.place();
 }
 
@@ -113,6 +118,7 @@ void printField(const int(&gridInfo)[2][MAPHEIGHT + 2][MAPWIDTH + 2], int delayM
 		cout << endl;
 	}
 	cout << endl;
+
 	//cout << "（图例： ~~：墙，[]：块，{}：新块）" << endl << endl;
 }
 

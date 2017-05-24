@@ -2,7 +2,6 @@
 
 
 
-
 /****************************************************************************************************/
 /******************************                                        ******************************/
 /******************************               Source File              ******************************/
@@ -26,6 +25,8 @@
  /* 1     simulate botzone.org	*/
  /* 2     Host local game		*/
 int MODE;
+
+Block::Block() {};
 
 Block::Block(const int &x, const int &y, const int &o)
 	:x(x), y(y), o(o) {}
@@ -115,12 +116,12 @@ namespace Sample
 	{
 		if (isValid() && !isValid(-1, block.y - 1))
 			return true;
-        int i, tmpX, tmpY;
-        for (i = 0; i < 4; i++)
-        {
-            tmpX = block.x + shape[block.o][2 * i];
-            tmpY = block.y + shape[block.o][2 * i + 1];
-        }
+		int i, tmpX, tmpY;
+		for (i = 0; i < 4; i++)
+		{
+			tmpX = block.x + shape[block.o][2 * i];
+			tmpY = block.y + shape[block.o][2 * i + 1];
+		}
 		return false;
 	}
 
@@ -450,9 +451,21 @@ int recoverState(int(&grids)[2][MAPHEIGHT + 2][MAPWIDTH + 2],
 
 void AI::GenerateStrategy(const State &mine, const State &ops, int level)
 {
+
+
 	if (level == 2)
 	{
+#ifndef QuickTest
+		mp.clear();
+#else
+		TODO;
+#endif // !QuickTest
 		negativeMaxSearch(mine, 1, -INF, INF, 0);
+#ifndef QuickTest
+		mp.clear();
+#else
+		TODO;
+#endif // !QuickTest
 		negativeMaxSearch(ops, 1, -INF, INF, 1);
 	}
 	if (level == 1)
@@ -462,22 +475,65 @@ void AI::GenerateStrategy(const State &mine, const State &ops, int level)
 	}
 }
 
+void AI::GreedySearch(const State &curState, int role)
+{
+	if (role == 1)
+	{
+		// 再看看给对方什么好
+		int maxCount = 0, minCount = 99;
+		for (int i = 0; i < 7; i++)
+		{
+			if (curState.typeCount[i] > maxCount)
+				maxCount = curState.typeCount[i];
+			if (curState.typeCount[i] < minCount)
+				minCount = curState.typeCount[i];
+		}
+		if (maxCount - minCount == 2)
+		{
+			// 危险，找一个不是最大的块给对方吧
+			for (blockForEnemy = 0; blockForEnemy < 7; blockForEnemy++)
+				if (curState.typeCount[blockForEnemy] != maxCount)
+					break;
+		}
+		else
+		{
+			blockForEnemy = rand() % 7;
+		}
+
+		//bestChoice.o = blockForEnemy;
+
+		return;
+
+	}
+	int totInfo = 0;
+	StateInfo info[180];
+	GenerateAllPossibleMove(curState, info, totInfo, role);
+
+	qsort(info, totInfo, sizeof(StateInfo), [](const void *va, const void *vb) {
+		return ((const StateInfo*)vb)->score - ((const StateInfo*)va)->score;
+	});
+	bestChoice = info[0].choice;
+
+
+
+}
+
 //role: 0, in my field; 1, in op's field
 int AI::negativeMaxSearch(const State &curState, int depth, int alpha, int beta, int role)
 {
 	int score;
 
 	// check whether current state has been calculated
-	if (mp.find(curState) != mp.end())
-		return mp.find(curState)->second;
+	if (mp.find({ curState,depth }) != mp.end())
+		return mp.find({ curState,depth })->second;
 
-	//!!
-	// 搜索深度达到 DEPTH + 1 ，已经胜利(改成不能放），则返回
-	score = evaluate(curState, role);
-	//!!! == must be changed
-	if (depth == DEPTH + 1/* || depth > 1 && abs(score) == LostValue*/) {
-		// 不同深度是否需要不同结果？
-		mp.insert({ curState, score });
+	// 搜索终点深度： DEPTH + 1	
+	//!!! == must be changed	//???
+	if (depth == DEPTH + 1/* || depth > 1 && abs(score) == LostValue*/) {	
+		score = evaluate(curState, role);
+		if (role)score = -score;
+		// 不同深度需要不同结果!
+		mp.insert({ { curState,depth }, score });
 		return score;
 	}
 
@@ -486,6 +542,7 @@ int AI::negativeMaxSearch(const State &curState, int depth, int alpha, int beta,
 	int index[180];
 	// 产生所有的走法
 	GenerateAllPossibleMove(curState, info, totInfo, role);
+
 	for (int i = 0; i < totInfo; i++)index[i] = i;
 
 	//x1
@@ -531,7 +588,7 @@ int AI::negativeMaxSearch(const State &curState, int depth, int alpha, int beta,
 	}
 
 	// hash
-	mp.insert({ curState,score });
+	mp.insert({ { curState,depth },score });
 
 	return score;
 }
@@ -556,48 +613,51 @@ void AI::GenerateAllPossibleMove(const State &curState, StateInfo *info, int &to
 		{
 			if (curState.typeCount[i] < 2 || curState.typeCount[i] == 2 && !containZero)
 			{
+
 				info[totInfo].state = curState;
 				info[totInfo].state.nextType = i;
 				//abnormal use of o
 				info[totInfo].choice.o = i;
-				++(info[totInfo].state.typeCount[i]);
+				++(info[totInfo].state.typeCount[curState.nextType]);
 				totInfo++;
 			}
 		}
 
+		
+
 		return;
 	}
 
-    int type = curState.nextType;
-    Sample::Tetris t(type, 0);
-    int topcan[MAPWIDTH + 1] = { 0 };
-    int can[MAPWIDTH + 1] = { 0 };
-    
-    // 枚举出最顶上那行所有可能的姿态和位置
-    for (int i = 0; i < MAPWIDTH; ++i) {
-        for (int k = 0; k < 4; ++k) {
-            if (t.isValid(curState, i, MAPHEIGHT - 1, k)) {
-                topcan[i] |= (1 << k);
-            }
-        }
-    }
-    
+	int type = curState.nextType;
+	Sample::Tetris t(type, 0);
+	int topcan[MAPWIDTH + 1] = { 0 };
+	int can[MAPWIDTH + 1] = { 0 };
+
+	// 枚举出最顶上那行所有可能的姿态和位置
+	for (int i = 0; i < MAPWIDTH; ++i) {
+		for (int k = 0; k < 4; ++k) {
+			if (t.isValid(curState, i, MAPHEIGHT - 1, k)) {
+				topcan[i] |= (1 << k);
+			}
+		}
+	}
+
 	for (int x = 0; x < MAPWIDTH; ++x) {
 		for (int y = MAPHEIGHT - 1; y >= 0; --y) {
 
-            memcpy(can, topcan, sizeof can);
+			memcpy(can, topcan, sizeof can);
 
-            if (y != MAPHEIGHT - 1) {
-                for (int i = 0; i < MAPWIDTH; ++i) {
-                    for (int k = 0; k < 4; ++k) {
-                        if (!(can[i] & (1 << k)))
-                            continue;
-                        if (!t.isValid(curState, i, MAPWIDTH - 2, k)) {
-                            can[i] &= ~(1 << k);
-                        }
-                    }
-                }
-            }
+			if (y != MAPHEIGHT - 1) {
+				for (int i = 0; i < MAPWIDTH; ++i) {
+					for (int k = 0; k < 4; ++k) {
+						if (!(can[i] & (1 << k)))
+							continue;
+						if (!t.isValid(curState, i, MAPWIDTH - 2, k)) {
+							can[i] &= ~(1 << k);
+						}
+					}
+				}
+			}
 
 			// 往下降一格，每个方块原地转转看看行不行，再往左看看行不行，再原地转转看看行不行
 			for (int j = MAPHEIGHT - 2; j > y; --j) {
@@ -632,8 +692,8 @@ void AI::GenerateAllPossibleMove(const State &curState, StateInfo *info, int &to
 						}
 					}
 				}
-                // 掉不下去的就不管了
-                // TODO: 全零优化
+				// 掉不下去的就不管了
+				// TODO: 全零优化
 				for (int i = 0; i < MAPWIDTH; ++i) {
 					for (int k = 0; k < 4; ++k) {
 						if (!(can[i] & (1 << k)))
@@ -645,9 +705,9 @@ void AI::GenerateAllPossibleMove(const State &curState, StateInfo *info, int &to
 				}
 			}
 
-            for (int o = 0; o < 4; ++o) {
-                if (!t.isValid(curState, x, y, o)) continue;
-                if (y > 0 && t.isValid(curState, x, y - 1, o)) continue;
+			for (int o = 0; o < 4; ++o) {
+				if (!t.isValid(curState, x, y, o)) continue;
+				if (y > 0 && t.isValid(curState, x, y - 1, o)) continue;
 				if (can[x] & (1 << o)) {
 					info[totInfo] = AI::StateInfo();
 					info[totInfo].state = curState;
@@ -775,54 +835,9 @@ determined:
 	return 0;
 }
 
-
-
 bool AI::IndexCmp::operator ()(const int a, const int b)const
 {
 	return info[a].score > info[b].score;
-}
-
-void AI::GreedySearch(const State &curState, int role)
-{
-	if (role == 1)
-	{
-		// 再看看给对方什么好
-		int maxCount = 0, minCount = 99;
-		for (int i = 0; i < 7; i++)
-		{
-			if (curState.typeCount[i] > maxCount)
-				maxCount = curState.typeCount[i];
-			if (curState.typeCount[i] < minCount)
-				minCount = curState.typeCount[i];
-		}
-		if (maxCount - minCount == 2)
-		{
-			// 危险，找一个不是最大的块给对方吧
-			for (blockForEnemy = 0; blockForEnemy < 7; blockForEnemy++)
-				if (curState.typeCount[blockForEnemy] != maxCount)
-					break;
-		}
-		else
-		{
-			blockForEnemy = rand() % 7;
-		}
-
-		//bestChoice.o = blockForEnemy;
-
-		return;
-
-	}
-	int totInfo = 0;
-	StateInfo info[180];
-	GenerateAllPossibleMove(curState, info, totInfo, role);
-
-	qsort(info, totInfo, sizeof(StateInfo), [](const void *va, const void *vb) {
-		return ((const StateInfo*)vb)->score - ((const StateInfo*)va)->score;
-	});
-	bestChoice = info[0].choice;
-
-
-
 }
 
 void outputResult(const int &blockForEnemy, const Block &result)
@@ -907,7 +922,7 @@ bool canReach(int color, int blockType, int x, int y, int o)
 			}
 		}
 	}
-	return bool(can[x] & (1 << o));
+	return can[x] & (1 << o);
 }
 
 //!! adjusted gridInfo size
@@ -974,36 +989,13 @@ State::State(const int(&_grid)[MAPHEIGHT][MAPWIDTH],
 	{
 		for (int j = 0; j < 10; j++)
 		{
-			grids[i][j] = (bool)_grid[i][j];
+			grids[i][j] = _grid[i][j];
 		}
 	}
 	memcpy(typeCount, _typeCount, sizeof(typeCount));
 	auto min = *min_element(typeCount, typeCount + 7);
 	for (int i = 0; i < 7; i++)
 		typeCount[i] -= min;
-}
-
-State::operator Int256()const
-{
-	Int256 ret;
-	//memset(ret.data, 0, sizeof(ret.data));
-	for (int d = 0; d < 3; d++)
-	{
-		for (int i = 0; i < 63; i++)
-		{
-			if (grids[(d * 64 + i) / 10][(d * 64 + i) % 10])
-				ret.data[d] += 1ull << i;
-		}
-	}
-	for (int i = 2; i < 9; i++)
-		if (grids[19][i])
-			ret.data[3] += 1ull << i;
-	for (int i = 0; i < 7; i++)
-	{
-		ret.data[3] += typeCount[i] << (i * 2 + 10);
-	}
-	ret.data[3] += nextType << 30;
-	return ret;
 }
 
 void State::init()
@@ -1018,13 +1010,32 @@ void State::init()
 
 namespace std
 {
-	unsigned hash<State>::operator()(const State &state)const
+	unsigned hash<pair<State, int>>::operator()(const pair<State, int> &state)const
 	{
-		Int256 i = state;
-		return hash<ULL>()(i.data[0]) ^
-			hash<ULL>()(i.data[1]) ^
-			hash<ULL>()(i.data[2]) ^
-			hash<ULL>()(i.data[3]);
+		Int256 ret;
+		//memset(ret.data, 0, sizeof(ret.data));
+		for (int d = 0; d < 3; d++)
+		{
+			for (int i = 0; i < 63; i++)
+			{
+				if (state.first.grids[(d * 64 + i) / 10][(d * 64 + i) % 10])
+					ret.data[d] |= 1ull << i;
+			}
+		}
+		for (int i = 2; i < 9; i++)
+			if (state.first.grids[19][i])
+				ret.data[3] |= 1ull << i;
+		for (int i = 0; i < 7; i++)
+		{
+			ret.data[3] |= state.first.typeCount[i] << (i * 2 + 10);
+		}
+		ret.data[3] |= state.first.nextType << 30;
+		ret.data[3] |= (ULL)(state.second) << 40;
+
+		return hash<ULL>()(ret.data[0]) ^
+			hash<ULL>()(ret.data[1]) ^
+			hash<ULL>()(ret.data[2]) ^
+			hash<ULL>()(ret.data[3]);
 	}
 }
 
@@ -1056,8 +1067,6 @@ int main()
 	int typeCount[2][7] = { 0 };
 	// 先y后x，记录地图状态，0为空，1为以前放置，2为刚刚放置，负数为越界
 	int curGrid[2][MAPHEIGHT + 2][MAPWIDTH + 2] = { 0 };
-
-
 
 	programInit();
 

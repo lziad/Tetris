@@ -2,7 +2,6 @@
 
 #include <iostream>
 
-
 #include <cstring>
 #include <string>
 #include <ctime>
@@ -25,8 +24,8 @@
 #define LostValue -10000000
 #define ULL unsigned long long
 #define sleep(ms) std::this_thread::sleep_for(std::chrono::milliseconds(ms))
-#define DefaultMode 1
-#define PrintFieldDelay 300
+#define DefaultMode 2
+#define PrintFieldDelay 150
 
 using namespace std;
 using namespace std::placeholders;
@@ -61,7 +60,8 @@ struct Block
 {
 	int x, y, o;
 
-	Block() {}
+	Block();
+
 	Block(const int &x, const int &y, const int &o);
 
 	Block(const Json::Value& jv);
@@ -72,13 +72,13 @@ struct Block
 namespace Sample
 {
 	extern int gridInfo[2][MAPHEIGHT + 2][MAPWIDTH + 2];
-	 
+
 	extern int trans[2][4][MAPWIDTH + 2];
-	 
+
 	extern int transCount[2];
-	 
+
 	extern int maxHeight[2];
-	 
+
 	extern int score[2];
 
 	class Tetris
@@ -126,7 +126,7 @@ int interpretSeverLog(Json::Value& orig);
 
 void stateInit(int(&grids)[2][MAPHEIGHT + 2][MAPWIDTH + 2]);
 
-bool setAndJudge(const Block &,int, int);
+bool setAndJudge(const Block &, State &, int);
 
 int gameEngineWork();
 
@@ -151,7 +151,7 @@ bool operator== (const State &a, const State &b);
 
 struct State
 {
-	friend struct std::hash<State>;
+	friend struct std::hash<pair<State, int>>;
 	friend bool operator== (const State &a, const State &b);
 
 	bool grids[20][10];
@@ -161,7 +161,6 @@ struct State
 	State();
 	State(const int(&_grid)[MAPHEIGHT][MAPWIDTH],
 		const int(&_typeCount)[7], const int nextType);
-	operator Int256()const;
 	void init();
 
 };
@@ -169,18 +168,18 @@ struct State
 namespace std
 {
 	template<>
-	struct hash<State>
+	struct hash<pair<State, int>>
 	{
 		typedef unsigned result_type;
-		typedef State argument_type;
-		unsigned operator()(const State &state)const;
+		typedef pair<State, int> argument_type;
+		unsigned operator()(const pair<State, int> &state)const;
 
 	};
 }
 
 struct AI
 {
-	unordered_map<State, int> mp;
+	unordered_map<pair<State, int>, int> mp;
 
 	Block bestChoice;
 	int blockForEnemy;
@@ -200,7 +199,7 @@ struct AI
 		bool operator()(const int a, const int b)const;
 	};
 
-	void GenerateStrategy(const State &mine, const State &ops,int level);
+	void GenerateStrategy(const State &mine, const State &ops, int level);
 
 	void GenerateAllPossibleMove(const State &curState, StateInfo *info, int &totInfo, int role);
 
