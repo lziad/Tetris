@@ -591,6 +591,8 @@ int AI::negativeMaxSearch(const State &curState, int depth, int alpha, int beta,
 
 	// hash
 	mp.insert({ { curState,depth },score });
+    
+    return 0; // Control may reach end of non-void function
 }
 void input(State &aaa) {
     char c;
@@ -640,7 +642,8 @@ void AI::GenerateAllPossibleMove(const State &curState, StateInfo *info, int &to
 
 		return;
 	}
-  int type = curState.nextType;
+    
+    int type = curState.nextType;
     Sample::Tetris t(type, 0);
     int can[MAPHEIGHT + 1][MAPWIDTH + 1] = { 0 };
     
@@ -684,7 +687,7 @@ void AI::GenerateAllPossibleMove(const State &curState, StateInfo *info, int &to
             // 往左、往右
             for (int k = 0; k < 4; ++k) {
                 int p = i;
-                if (!can[j][i]) continue;
+                if (!(can[j][i] & (1 << k))) continue;
                 while (--p >= 0 && !(can[j][p] & (1 << k))) {
                     if (t.isValid(curState, p, j, k)) {
                         can[j][p] |= (1 << k);
@@ -696,6 +699,8 @@ void AI::GenerateAllPossibleMove(const State &curState, StateInfo *info, int &to
                             can[j][p] |= (1 << z);
                             z = (++z) & 3;
                         }
+                    } else {
+                        break;
                     }
                 }
                 p = i;
@@ -711,6 +716,8 @@ void AI::GenerateAllPossibleMove(const State &curState, StateInfo *info, int &to
                             can[j][p] |= (1 << z);
                             z = (++z) & 3;
                         }
+                    } else {
+                        break;
                     }
                 }
             }
