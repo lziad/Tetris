@@ -1,5 +1,4 @@
-
-#include <iostream>
+﻿#include <iostream>
 
 #include <cstring>
 #include <string>
@@ -23,9 +22,7 @@
 #define LostValue -10000000
 #define ULL unsigned long long
 #define sleep(ms) std::this_thread::sleep_for(std::chrono::milliseconds(ms))
-#define DefaultMode 2
-#define PrintFieldDelay 300
-
+#define DefaultMode 1
 
 using namespace std;
 using namespace std::placeholders;
@@ -56,6 +53,10 @@ struct State;
 
 extern int MODE;
 
+extern int blockForEnemy;
+
+extern Block result;
+
 struct Block
 {
 	int x, y, o;
@@ -68,16 +69,17 @@ struct Block
 	operator Json::Value()const;
 };
 
+
 namespace Sample
 {
 	extern int gridInfo[2][MAPHEIGHT + 2][MAPWIDTH + 2];
-	 
+
 	extern int trans[2][4][MAPWIDTH + 2];
-	 
+
 	extern int transCount[2];
-	 
+
 	extern int maxHeight[2];
-	 
+
 	extern int score[2];
 
 	class Tetris
@@ -118,6 +120,9 @@ namespace Sample
 
 	inline bool canContinue(int color, int blockType);
 
+	int sampleStrategy(
+		const int(&gridInfo)[2][MAPHEIGHT + 2][MAPWIDTH + 2], int(&typeCount)[2][7],
+		const int nextBlockType, int depth, int alpha, int beta, int role);
 }
 
 //abstruct input data from server log
@@ -125,7 +130,8 @@ int interpretSeverLog(Json::Value& orig);
 
 void stateInit(int(&grids)[2][MAPHEIGHT + 2][MAPWIDTH + 2]);
 
-bool setAndJudge(const Block &,int, int);
+
+bool setAndJudge(int, int);
 
 int gameEngineWork();
 
@@ -134,8 +140,6 @@ bool canReach(int color, int blockType, int x, int y, int o);
 int evaluate(const State &state, int role);
 
 void printField(const int(&gridInfo)[2][MAPHEIGHT + 2][MAPWIDTH + 2], int delayMs = 0, bool clean = true);
-
-void printField(const State(&state)[2], int delayMs = 0, bool clean = true);
 
 struct Int256
 {
@@ -157,7 +161,7 @@ struct State
 	//TODO simplized to 0 1 2 3 (normally won't exceed 2)
 	short typeCount[7];
 	short nextType;
-	State();
+	State() {}
 	State(const int(&_grid)[MAPHEIGHT][MAPWIDTH],
 		const int(&_typeCount)[7], const int nextType);
 	operator Int256()const;
@@ -182,7 +186,10 @@ struct AI
 	unordered_map<State, int> mp;
 
 	Block bestChoice;
-	int blockForEnemy;
+
+	void GenerateStrategy(const State(&states)[2]);
+
+	int negativeMaxSearch(const State &curState, int depth, int alpha, int beta, int role);
 
 	struct StateInfo
 	{
@@ -199,23 +206,9 @@ struct AI
 		bool operator()(const int a, const int b)const;
 	};
 
-	void GenerateStrategy(const State &mine, const State &ops,int level);
-
 	void GenerateAllPossibleMove(const State &curState, StateInfo *info, int &totInfo, int role);
 
-	void GreedySearch(const State &curState, int role);
-
-	int sampleStrategy(
-		const int(&gridInfo)[2][MAPHEIGHT + 2][MAPWIDTH + 2], int(&typeCount)[2][7],
-		const int nextBlockType, int depth, int alpha, int beta, int role);
-
-	int negativeMaxSearch(const State &curState, int depth, int alpha, int beta, int role);
-
 };
-
-void gridsTransfer(int(&dst)[MAPHEIGHT + 2][MAPWIDTH + 2], const State &state);
-
-void gridsTransfer(State &state, const int(&dst)[MAPHEIGHT + 2][MAPWIDTH + 2]);
 
 
 ﻿
@@ -247,6 +240,10 @@ void gridsTransfer(State &state, const int(&dst)[MAPHEIGHT + 2][MAPWIDTH + 2]);
  /* 2     Host local game		*/
 int MODE;
 
+int blockForEnemy;
+
+Block result;
+
 Block::Block(const int &x, const int &y, const int &o)
 	:x(x), y(y), o(o) {}
 
@@ -260,8 +257,8 @@ Block::Block(const Json::Value& jv)
 Block::operator Json::Value()const
 {
 	Json::Value jv;
-	jv["x"] = x + 1;
-	jv["y"] = y + 1;
+	jv["x"] = x;
+	jv["y"] = y;
 	jv["o"] = o;
 	return jv;
 }
@@ -273,6 +270,7 @@ bool operator==(const State &a, const State &b)
 	if (memcmp(a.grids, b.grids, sizeof(a.grids)))return false;
 	return true;
 }
+
 
 namespace Sample
 {
@@ -335,12 +333,6 @@ namespace Sample
 	{
 		if (isValid() && !isValid(-1, block.y - 1))
 			return true;
-        int i, tmpX, tmpY;
-        for (i = 0; i < 4; i++)
-        {
-            tmpX = block.x + shape[block.o][2 * i];
-            tmpY = block.y + shape[block.o][2 * i + 1];
-        }
 		return false;
 	}
 
@@ -517,6 +509,53 @@ namespace Sample
 		return false;
 	}
 
+	//样例决策
+	int sampleStrategy(
+		const int(&gridInfo)[2][MAPHEIGHT + 2][MAPWIDTH + 2], int(&typeCount)[2][7],
+		const int nextBlockType, int depth, int alpha, int beta, int role)
+	{
+		memcpy(Sample::gridInfo, gridInfo, sizeof(gridInfo));
+		int myColor = role;
+		/* 贪心决策												*/
+		/* 从下往上以各种姿态找到第一个位置，要求能够直着落下		*/
+		Sample::Tetris block(nextBlockType, myColor);
+		for (int y = 1; y <= MAPHEIGHT; y++)
+			for (int x = 1; x <= MAPWIDTH; x++)
+				for (int o = 0; o < 4; o++)
+				{
+					if (block.set(x, y, o).isValid() &&
+						Sample::checkDirectDropTo(myColor, block.blockType, x, y, o))
+					{
+						result = { x,y,o };
+						goto determined;
+					}
+				}
+
+	determined:
+		// 再看看给对方什么好
+
+		int maxCount = 0, minCount = 99;
+		for (int i = 0; i < 7; i++)
+		{
+			if (typeCount[1 - myColor][i] > maxCount)
+				maxCount = typeCount[1 - myColor][i];
+			if (typeCount[1 - myColor][i] < minCount)
+				minCount = typeCount[1 - myColor][i];
+		}
+		if (maxCount - minCount == 2)
+		{
+			// 危险，找一个不是最大的块给对方吧
+			for (blockForEnemy = 0; blockForEnemy < 7; blockForEnemy++)
+				if (typeCount[1 - myColor][blockForEnemy] != maxCount)
+					break;
+		}
+		else
+		{
+			blockForEnemy = rand() % 7;
+		}
+
+		return 0;
+	}
 
 }
 
@@ -668,18 +707,9 @@ int recoverState(int(&grids)[2][MAPHEIGHT + 2][MAPWIDTH + 2],
 	return 0;
 }
 
-void AI::GenerateStrategy(const State &mine, const State &ops, int level)
+void AI::GenerateStrategy(const State(&states)[2])
 {
-	if (level == 2)
-	{
-		negativeMaxSearch(mine, 1, -INF, INF, 0);
-		negativeMaxSearch(ops, 1, -INF, INF, 1);
-	}
-	if (level == 1)
-	{
-		GreedySearch(mine, 0);
-		GreedySearch(ops, 1);
-	}
+
 }
 
 //role: 0, in my field; 1, in op's field
@@ -743,11 +773,7 @@ int AI::negativeMaxSearch(const State &curState, int depth, int alpha, int beta,
 	//x2
 
 	if (depth == 1) {
-		if (role == 0)
-			AI::bestChoice = bestChoice;
-		else
-			AI::blockForEnemy = bestChoice.o;
-
+		AI::bestChoice = bestChoice;
 	}
 
 	// hash
@@ -780,7 +806,6 @@ void AI::GenerateAllPossibleMove(const State &curState, StateInfo *info, int &to
 				info[totInfo].state.nextType = i;
 				//abnormal use of o
 				info[totInfo].choice.o = i;
-				++(info[totInfo].state.typeCount[i]);
 				totInfo++;
 			}
 		}
@@ -788,36 +813,21 @@ void AI::GenerateAllPossibleMove(const State &curState, StateInfo *info, int &to
 		return;
 	}
 
-    int type = curState.nextType;
-    Sample::Tetris t(type, 0);
-    int topcan[MAPWIDTH + 1] = { 0 };
-    int can[MAPWIDTH + 1] = { 0 };
-    
-    // 枚举出最顶上那行所有可能的姿态和位置
-    for (int i = 0; i < MAPWIDTH; ++i) {
-        for (int k = 0; k < 4; ++k) {
-            if (t.isValid(curState, i, MAPHEIGHT - 1, k)) {
-                topcan[i] |= (1 << k);
-            }
-        }
-    }
-    
+
+	int type = curState.nextType;
 	for (int x = 0; x < MAPWIDTH; ++x) {
-		for (int y = MAPHEIGHT - 1; y >= 0; --y) {
+		for (int y = MAPWIDTH - 1; y >= 0; --y) {
+			int can[MAPWIDTH + 1] = { 0 };
+			Sample::Tetris t(type, 0);
 
-            memcpy(can, topcan, sizeof can);
-
-            if (y != MAPHEIGHT - 1) {
-                for (int i = 0; i < MAPWIDTH; ++i) {
-                    for (int k = 0; k < 4; ++k) {
-                        if (!(can[i] & (1 << k)))
-                            continue;
-                        if (!t.isValid(curState, i, MAPWIDTH - 2, k)) {
-                            can[i] &= ~(1 << k);
-                        }
-                    }
-                }
-            }
+			// 枚举出最顶上那行所有可能的姿态和位置
+			for (int i = 0; i < MAPWIDTH; ++i) {
+				for (int k = 0; k < 4; ++k) {
+					if (t.isValid(curState, i, MAPHEIGHT - 1, k)) {
+						can[i] |= (1 << k);
+					}
+				}
+			}
 
 			// 往下降一格，每个方块原地转转看看行不行，再往左看看行不行，再原地转转看看行不行
 			for (int j = MAPHEIGHT - 2; j > y; --j) {
@@ -837,7 +847,7 @@ void AI::GenerateAllPossibleMove(const State &curState, StateInfo *info, int &to
 					// 往左
 					for (int k = 0; k < 4; ++k) {
 						int p = i;
-						while (--p >= 0 && !(can[p] & (1 << k))) {
+						while (--p && !(can[p] & (1 << k))) {
 							if (t.isValid(curState, p, j, k)) {
 								can[p] |= (1 << k);
 								// 再转转
@@ -852,8 +862,7 @@ void AI::GenerateAllPossibleMove(const State &curState, StateInfo *info, int &to
 						}
 					}
 				}
-                // 掉不下去的就不管了
-                // TODO: 全零优化
+				// 掉不下去的就不管了
 				for (int i = 0; i < MAPWIDTH; ++i) {
 					for (int k = 0; k < 4; ++k) {
 						if (!(can[i] & (1 << k)))
@@ -865,9 +874,9 @@ void AI::GenerateAllPossibleMove(const State &curState, StateInfo *info, int &to
 				}
 			}
 
-            for (int o = 0; o < 4; ++o) {
-                if (!t.isValid(curState, x, y, o)) continue;
-                if (y > 0 && t.isValid(curState, x, y - 1, o)) continue;
+			for (int o = 0; o < 4; ++o) {
+				if (y > 0 && t.isValid(curState, x, y - 1, o)) continue;
+				if (!t.isValid(curState, x, y, o)) continue;
 				if (can[x] & (1 << o)) {
 					info[totInfo] = AI::StateInfo();
 					info[totInfo].state = curState;
@@ -918,7 +927,6 @@ void AI::GenerateAllPossibleMove(const State &curState, StateInfo *info, int &to
 								}
 								isFull = false;
 							}
-							curRowStatus = info[totInfo].state.grids[j][i];
 						}
 						memcpy(curColStatus, info[totInfo].state.grids[j], sizeof(curColStatus));
 						if (isFull) {
@@ -947,102 +955,9 @@ void AI::GenerateAllPossibleMove(const State &curState, StateInfo *info, int &to
 	}
 }
 
-//样例决策
-int AI::sampleStrategy(
-	const int(&gridInfo)[2][MAPHEIGHT + 2][MAPWIDTH + 2], int(&typeCount)[2][7],
-	const int nextBlockType, int depth, int alpha, int beta, int role)
-{
-	memcpy(Sample::gridInfo, gridInfo, sizeof(gridInfo));
-	int myColor = role;
-	/* 贪心决策												*/
-	/* 从下往上以各种姿态找到第一个位置，要求能够直着落下		*/
-	Sample::Tetris block(nextBlockType, myColor);
-	for (int y = 1; y <= MAPHEIGHT; y++)
-		for (int x = 1; x <= MAPWIDTH; x++)
-			for (int o = 0; o < 4; o++)
-			{
-				if (block.set(x, y, o).isValid() &&
-					Sample::checkDirectDropTo(myColor, block.blockType, x, y, o))
-				{
-					bestChoice = { x,y,o };
-					goto determined;
-				}
-			}
-
-determined:
-	// 再看看给对方什么好
-
-	int maxCount = 0, minCount = 99;
-	for (int i = 0; i < 7; i++)
-	{
-		if (typeCount[1 - myColor][i] > maxCount)
-			maxCount = typeCount[1 - myColor][i];
-		if (typeCount[1 - myColor][i] < minCount)
-			minCount = typeCount[1 - myColor][i];
-	}
-	if (maxCount - minCount == 2)
-	{
-		// 危险，找一个不是最大的块给对方吧
-		for (blockForEnemy = 0; blockForEnemy < 7; blockForEnemy++)
-			if (typeCount[1 - myColor][blockForEnemy] != maxCount)
-				break;
-	}
-	else
-	{
-		blockForEnemy = rand() % 7;
-	}
-
-	return 0;
-}
-
-
-
 bool AI::IndexCmp::operator ()(const int a, const int b)const
 {
 	return info[a].score > info[b].score;
-}
-
-void AI::GreedySearch(const State &curState, int role)
-{
-	if (role == 1)
-	{
-		// 再看看给对方什么好
-		int maxCount = 0, minCount = 99;
-		for (int i = 0; i < 7; i++)
-		{
-			if (curState.typeCount[i] > maxCount)
-				maxCount = curState.typeCount[i];
-			if (curState.typeCount[i] < minCount)
-				minCount = curState.typeCount[i];
-		}
-		if (maxCount - minCount == 2)
-		{
-			// 危险，找一个不是最大的块给对方吧
-			for (int blockForEnemy = 0; blockForEnemy < 7; blockForEnemy++)
-				if (curState.typeCount[blockForEnemy] != maxCount)
-					break;
-		}
-		else
-		{
-			blockForEnemy = rand() % 7;
-		}
-
-		//bestChoice.o = blockForEnemy;
-
-		return;
-
-	}
-	int totInfo = 0;
-	StateInfo info[180];
-	GenerateAllPossibleMove(curState, info, totInfo, role);
-
-	qsort(info, totInfo, sizeof(StateInfo), [](const void *va, const void *vb) {
-		return ((const StateInfo*)vb)->score - ((const StateInfo*)va)->score;
-	});
-	bestChoice = info[0].choice;
-
-
-
 }
 
 void outputResult(const int &blockForEnemy, const Block &result)
@@ -1167,7 +1082,6 @@ int evaluate(const State &state, int role)
 				}
 				isFull = false;
 			}
-			curRowStatus = state.grids[j][i];
 		}
 		memcpy(curColStatus, state.grids[j], sizeof(curColStatus));
 		if (isFull) {
@@ -1183,8 +1097,6 @@ int evaluate(const State &state, int role)
 		-7899 * holes +
 		-3386 * wellSum;
 }
-
-State::State() {};
 
 State::State(const int(&_grid)[MAPHEIGHT][MAPWIDTH],
 	const int(&_typeCount)[7], const int nextType)
@@ -1258,7 +1170,7 @@ inline bool Sample::Tetris::isValid(const State &curState, int x, int y, int o)
 		tmpY = y + shape[o][2 * i + 1];
 		if (tmpX < 0 || tmpX >= MAPWIDTH ||
 			tmpY < 0 || tmpY >= MAPHEIGHT ||
-			curState.grids[tmpY][tmpX])
+			curState.grids[tmpY][tmpX] != 0)
 			return false;
 	}
 	return true;
@@ -1302,8 +1214,13 @@ int main()
 #endif // _BOTZONE_ONLINE
 
 		auto ai = new AI();
-		ai->GenerateStrategy(curState[myColor], curState[1 - myColor], 1);
-		outputResult(ai->blockForEnemy, ai->bestChoice);
+
+		ai->negativeMaxSearch(curState[myColor], 1, -INF, INF, myColor);
+		result = ai->bestChoice;
+		ai->negativeMaxSearch(curState[1 - myColor], 1, -INF, INF, 1 - myColor);
+		blockForEnemy = ai->bestChoice.o;
+
+		outputResult(blockForEnemy, result);
 	}
 #ifndef _BOTZONE_ONLINE
 	else if (MODE == 2)

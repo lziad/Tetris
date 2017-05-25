@@ -1,5 +1,4 @@
-﻿#pragma once	//must be the first line
-
+﻿#pragma once
 #include <iostream>
 
 #include <cstring>
@@ -25,6 +24,7 @@
 #define ULL unsigned long long
 #define sleep(ms) std::this_thread::sleep_for(std::chrono::milliseconds(ms))
 #define DefaultMode 2
+
 #define PrintFieldDelay 150
 
 using namespace std;

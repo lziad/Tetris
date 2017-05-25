@@ -1,4 +1,5 @@
-﻿#include "LocalTestPackage.h"
+#include "LocalTestPackage.h"
+
 
 using std::cout;
 
@@ -31,13 +32,16 @@ int gameEngineWork()
 {
 	// init
 	State curState[2];
+
 	for (auto &i : curState) 
 	{
 		i.init();
 		i.nextType = rand() % 7;
 	}
+
 	int loser = -1;
 	stateInit(Sample::gridInfo);
+	//printField(Sample::gridInfo);
 
 	auto ais = new AI[2];
 
