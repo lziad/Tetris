@@ -792,7 +792,7 @@ void AI::GenerateAllPossibleMove(const State &curState, StateInfo *info, int &to
                     }
                     
                     info[totInfo].score =
-                    -4500 * landingHeight +
+                    -1125 * landingHeight * landingHeight +
                     3418 * fullLines * fullPieces +
                     -3218 * rowTrans +
                     -9349 * colTrans +
@@ -994,7 +994,7 @@ int evaluate(const State &state, int role)
     }
     
     return
-    -4500 * landingHeight +
+    -1125 * landingHeight * landingHeight +
     3418 * fullLines +
     -3218 * rowTrans +
     -9349 * colTrans +
