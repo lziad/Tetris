@@ -1,4 +1,4 @@
-
+﻿
 
 
 
@@ -531,7 +531,7 @@ int AI::negativeMaxSearch(const State &curState, int depth, int alpha, int beta,
 
 	// 搜索终点深度： DEPTH + 1	
 	//!!! == must be changed	//???
-	if (depth == DEPTH + 1/* || depth > 1 && abs(score) == LostValue*/) {	
+	if (depth == DEPTH + 1/* || depth > 1 && abs(score) == LostValue*/) {
 		score = evaluate(curState, role);
 		if (role)score = -score;
 		// 不同深度需要不同结果!
@@ -591,7 +591,7 @@ int AI::negativeMaxSearch(const State &curState, int depth, int alpha, int beta,
 
 	// hash
 	mp.insert({ { curState,depth },score });
-
+}
 void input(State &aaa) {
     char c;
     for (int i = 19; i >= 0; --i) {
@@ -854,51 +854,6 @@ bool AI::IndexCmp::operator ()(const int a, const int b)const
     return info[a].score > info[b].score;
 }
 
-
-void AI::GreedySearch(const State &curState, int role)
-{
-    if (role == 1)
-    {
-        // 再看看给对方什么好
-        int maxCount = 0, minCount = 99;
-        for (int i = 0; i < 7; i++)
-        {
-            if (curState.typeCount[i] > maxCount)
-                maxCount = curState.typeCount[i];
-            if (curState.typeCount[i] < minCount)
-                minCount = curState.typeCount[i];
-        }
-        if (maxCount - minCount == 2)
-        {
-            // 危险，找一个不是最大的块给对方吧
-            for (int blockForEnemy = 0; blockForEnemy < 7; blockForEnemy++)
-                if (curState.typeCount[blockForEnemy] != maxCount)
-                    break;
-        }
-        else
-        {
-            blockForEnemy = rand() % 7;
-        }
-        
-        //bestChoice.o = blockForEnemy;
-        
-        return;
-        
-    }
-    int totInfo = 0;
-    StateInfo info[180];
-    GenerateAllPossibleMove(curState, info, totInfo, role);
-    
-    qsort(info, totInfo, sizeof(StateInfo), [](const void *va, const void *vb) {
-        return ((const StateInfo*)vb)->score - ((const StateInfo*)va)->score;
-    });
-    bestChoice = info[0].choice;
-    
-    
-    
-}
-
-
 void outputResult(const int &blockForEnemy, const Block &result)
 {
     Json::Value output;
@@ -1058,7 +1013,6 @@ State::State(const int(&_grid)[MAPHEIGHT][MAPWIDTH],
 	for (int i = 0; i < 7; i++)
 		typeCount[i] -= min;
 }
-
 
 void State::init()
 {

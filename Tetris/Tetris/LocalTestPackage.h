@@ -19,13 +19,13 @@
 #define MAPHEIGHT 20
 #define MAPWIDTH 10
 #define INF 999999999 //TODO modify max scores
-#define DEPTH 3 // 现在只能这样，4奇慢无比，3秒出。。。
+#define DEPTH 5 // 现在只能这样，4奇慢无比，3秒出。。。
 #define LostValue -10000000
 #define ULL unsigned long long
 #define sleep(ms) std::this_thread::sleep_for(std::chrono::milliseconds(ms))
 #define DefaultMode 2
 
-#define PrintFieldDelay 150
+#define PrintFieldDelay 0
 
 using namespace std;
 using namespace std::placeholders;
